@@ -6,6 +6,10 @@ from personal_shopping_agent.storage.database import (
     create_sqlite_engine,
     session_scope,
 )
+from personal_shopping_agent.storage.observation_repository import (
+    ObservationKindMismatchError,
+    SQLitePlatformObservationRepository,
+)
 from personal_shopping_agent.storage.repository import (
     DuplicateEntityError,
     EntityNotFoundError,
@@ -22,6 +26,8 @@ __all__ = [
     "DuplicateEntityError",
     "EntityNotFoundError",
     "InvalidReferenceError",
+    "ObservationKindMismatchError",
+    "SQLitePlatformObservationRepository",
     "SQLiteShoppingRepository",
     "SQLiteWorkflowRepository",
     "create_schema",
