@@ -281,6 +281,21 @@ def test_open_allows_missing_navigation_response_without_screenshot(tmp_path: Pa
     assert page.screenshot_calls == []
 
 
+def test_open_does_not_capture_unsuccessful_response_screenshot(tmp_path: Path) -> None:
+    manager, page, _context, _chromium, _playwright = make_manager(tmp_path)
+    page.response = FakeResponse(403)
+
+    async def scenario() -> None:
+        await manager.start()
+        snapshot = await manager.open("https://shop.example/products", screenshot=True)
+        await manager.close()
+        assert snapshot.status_code == 403
+        assert snapshot.screenshot_path is None
+
+    run(scenario())
+    assert page.screenshot_calls == []
+
+
 def test_open_rejects_oversized_html(tmp_path: Path) -> None:
     manager, page, _context, _chromium, _playwright = make_manager(tmp_path, maximum_html_bytes=3)
     page.html = "four"
