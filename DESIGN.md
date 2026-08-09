@@ -27,7 +27,7 @@
 - SQLAlchemy 2.x、SQLite、Alembic：本地持久化（M1 起）
 - 官方 MCP Python SDK v2 / `MCPServer`：工具接口（M2 起）
 - Playwright Chromium：受控网页访问（M3 起）
-- Jinja2：Markdown/HTML 报告（M5 起）
+- Jinja2：后续 HTML 模板报告（M5 后续切片）
 - 系统 Keyring：敏感配置（需要账号能力时启用）
 
 第一阶段采用模块化单体，不引入分布式服务。各层通过明确的 Python 接口隔离，以便未来替换平台适配器、存储或模型提供方。
@@ -97,6 +97,11 @@ M1 使用 SQLite 保存结构化请求、商品、报价与证据。领域对象
 最终候选分数使用 `candidate_scores` 追加保存；每条记录必须同时引用请求、工作流和 Product，且同一
 工作流内每个 Product 只能有一条分数。索引列只保存资格、名次、Pareto 前沿、综合分和评分时间，
 能力评估、报价成本、证据置信度、排除原因和所有公式输入继续保存在经过重新校验的完整 JSON 快照中。
+
+确定性报告使用 `shopping_reports` 保存；同一工作流只允许一份当前方法版本的报告。索引列保存格式、
+生成时间和内容 SHA-256，完整 JSON 快照同时包含原始请求、候选分数、Product、实际最佳 Offer、参与
+评分的 Evidence 与已转义 Markdown。报告与 `report_rendered` 事件必须原子提交，不能只有状态而没有
+内容，或只有内容而没有审计事件。
 
 平台搜索和详情解析结果先作为 `SearchObservation` 与 `DetailObservation` 追加保存，并通过
 `request_id` 绑定触发采集的购物请求。该观察表只保存经过严格模型校验的结构化字段，不保存
@@ -296,6 +301,28 @@ FinalScore = clamp(0, 100,
 当前工作流的规范事实和核验记录，以及通过请求 Evidence 明确绑定的 Product 与 Offer；不能把其他请求
 或旧工作流的数据混入。没有候选、状态错误、模型校验、外键或并发修订失败时全部回滚，工作流保持在
 `data_normalized`。边际升级价值属于 M5 报告解释层，可由这些已保存指标计算，但不得反向改写 M4 名次。
+
+### 5.5 报告与 LLM 边界
+
+报告基础层不绑定 ChatGPT、OpenAI API 或任何其他模型厂商。ChatGPT 可以作为 MCP 宿主与用户对话，
+这与项目内部嵌入一个 LLM 提供方是两个独立层次。M5 第一个切片不得调用 LLM：它只从持久化的请求、
+候选分数、Product、最佳 Offer 和实际参与评分的 Evidence 构建 `ShoppingDecisionReport`，再由确定性
+渲染器输出 Markdown。即使没有网络或模型 API，用户仍应得到完整、可复核的比较报告。
+
+报告必须展示需求与预算、合格候选排名、预算层、选定价格与有效成本、综合分、每百元价值、证据
+置信度、Pareto 前沿、逐项能力/证据分、实际来源 URL、排除原因、采集时间和明确免责声明。没有合格
+候选时必须明确说明，而不是强行推荐。Product、Offer、Evidence 与 CandidateScore 的请求、工作流和
+主体标识必须精确一致；引用缺失、重复或多余输入都拒绝生成报告。
+
+平台标题、卖家名、商品名、用户需求及其他外部字符串均是不可信文本，进入 Markdown 前必须转义，
+不得注入标题、链接、HTML 或隐藏指令。报告 UTF-8 内容计算 SHA-256，并与完整 Pydantic 快照一起保存；
+读取时重新校验内容哈希。报告与 `report_rendered` 工作流事件使用同一 SQLite Session/事务，任一校验、
+外键或并发错误时整体回滚到 `candidates_scored`。
+
+后续 LLM 解释器必须通过模型无关端口接入；OpenAI/ChatGPT、DeepSeek 或本地模型只是可替换适配器。
+模型只能读取已验证报告快照，并返回受 Pydantic 约束的解释字段；不得新增事实、修改公式、重排候选、
+隐藏不确定性或生成购买/支付动作。模型不可用、输出校验失败或未配置 API 时，确定性报告是强制回退。
+ChatGPT 订阅不等同于 OpenAI API 授权，任何提供方密钥都不得进入仓库或报告快照。
 
 ## 6. 确定性工作流
 
