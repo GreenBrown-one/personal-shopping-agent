@@ -92,6 +92,19 @@ from personal_shopping_agent.application.observations import (
     PlatformObservationStore,
     SearchObservation,
 )
+from personal_shopping_agent.application.ranking import (
+    BudgetStatus,
+    CandidateDecisionInput,
+    CandidateRankingBatch,
+    CandidateRankingEngine,
+    CandidateScore,
+    CandidateScoringResult,
+    CandidateScoringService,
+    CandidateScoringUnitOfWork,
+    CandidateScoringUnitOfWorkFactory,
+    DuplicateCandidateError,
+    NoCandidatesForScoringError,
+)
 from personal_shopping_agent.application.service import (
     ShoppingWorkflowService,
     next_workflow_state,
@@ -106,11 +119,20 @@ from personal_shopping_agent.application.workflow import (
 )
 
 __all__ = [
+    "BudgetStatus",
+    "CandidateDecisionInput",
     "CandidateDiscovery",
     "CandidateDiscoveryService",
     "CandidateEvidenceConfidence",
+    "CandidateRankingBatch",
+    "CandidateRankingEngine",
+    "CandidateScore",
     "CandidateScoringFoundation",
     "CandidateScoringFoundationBuilder",
+    "CandidateScoringResult",
+    "CandidateScoringService",
+    "CandidateScoringUnitOfWork",
+    "CandidateScoringUnitOfWorkFactory",
     "CollectedPage",
     "ConvertedDetailBatch",
     "CriterionEvaluation",
@@ -120,6 +142,7 @@ __all__ = [
     "DetailConversionError",
     "DetailObservation",
     "DetailObservationConverter",
+    "DuplicateCandidateError",
     "EvidenceCheck",
     "EvidenceCheckStatus",
     "EvidenceConfidenceEvaluator",
@@ -134,6 +157,7 @@ __all__ = [
     "InvalidWorkflowTransitionError",
     "MeasurementDefinition",
     "NoCandidatesDiscoveredError",
+    "NoCandidatesForScoringError",
     "NoDetailObservationsError",
     "NoProductsForEvidenceCheckError",
     "NoSpecificationsForNormalizationError",

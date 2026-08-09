@@ -94,6 +94,10 @@ M1 使用 SQLite 保存结构化请求、商品、报价与证据。领域对象
 - Evidence 采用多态主体引用，允许同一主体字段保存多个观察以表达冲突；
 - JSON 快照用于保持领域契约完整，索引列只承担查询职责，不成为第二套事实来源。
 
+最终候选分数使用 `candidate_scores` 追加保存；每条记录必须同时引用请求、工作流和 Product，且同一
+工作流内每个 Product 只能有一条分数。索引列只保存资格、名次、Pareto 前沿、综合分和评分时间，
+能力评估、报价成本、证据置信度、排除原因和所有公式输入继续保存在经过重新校验的完整 JSON 快照中。
+
 平台搜索和详情解析结果先作为 `SearchObservation` 与 `DetailObservation` 追加保存，并通过
 `request_id` 绑定触发采集的购物请求。该观察表只保存经过严格模型校验的结构化字段，不保存
 原始 HTML、截图路径、Cookie 或浏览器会话。相同 SKU 在不同时间得到的不同价格、库存或规格
@@ -245,23 +249,53 @@ AdjustedUtility = Utility × EvidenceConfidence
 
 该输出仍只是排名输入，不包含报价价值指数、综合分、Pareto 前沿或最终推荐。
 
-### 5.4 最终排名（待实现）
+### 5.4 最终排名
 
-风险调整成本和性价比：
+最终排名只接受作用域一致、时间有效的 `CandidateScoringFoundation` 和
+`CandidateEvidenceConfidence`。请求条件的规范化键、权重、硬性标记和顺序必须与评分基础完全一致；
+最佳报价币种必须等于预算币种。评分时间必须带时区，证据置信度不得来自评分时间之后。
+
+候选先执行资格闸门。出现以下任一情况时保留分数快照和排除原因，但不生成价值指标、综合分、
+Pareto 前沿或名次：
+
+- 请求没有可评分条件；
+- 任一硬性条件未满足；
+- 没有可比最佳报价，或有效成本不大于 0；
+- 证据置信度为 0；
+- 选定价格超过弹性预算；没有弹性预算时，超过正常预算即排除。
+
+预算层以最佳报价的 `selected_price` 判断，而不是以风险调整后的成本判断。价格不高于正常上限时为
+`within_budget`；只在正常上限与可选弹性上限之间时为 `within_stretch`；更高时为 `over_budget`。
+正常预算层始终排在弹性预算层之前，避免轻微的能力优势默认替用户突破预算。风险仍通过
+`EffectiveCost` 与 `RiskPenalty` 单独表达：
 
 ```text
-EffectiveCost = estimated_total_cost × (1 + risk_coefficient)
+EffectiveCost = selected_price × (1 + risk_coefficient)
 ValueIndex = AdjustedUtility / EffectiveCost
-ValuePer100 = 100 × AdjustedUtility / EffectiveCost
+ValuePer100 = 100 × ValueIndex
+RiskPenalty = 100 × risk_coefficient
 ```
 
 面向最终展示的综合分：
 
 ```text
-FinalScore = 100 × (0.75 × Utility + 0.25 × EvidenceConfidence) - RiskPenalty
+FinalScore = clamp(0, 100,
+  100 × (0.75 × Utility + 0.25 × EvidenceConfidence - risk_coefficient)
+)
 ```
 
-硬性门槛先于排序；不满足关键能力下限的商品不能因为便宜而获得高性价比名次。系统还应计算边际升级价值和 Pareto 前沿，避免把单一总分伪装成唯一正确答案。
+`ValueIndex` 四舍五入到 12 位小数；`ValuePer100`、`RiskPenalty` 和 `FinalScore` 四舍五入到 6 位。
+综合分用于稳定排序和展示，不取代能力、证据、成本和风险的分项解释。
+
+正常预算层与弹性预算层分别计算 Pareto 前沿。支配关系同时要求：调整后效用不低、证据置信度不低、
+有效成本不高，并且至少一项严格更好。未被支配的候选为第 1 前沿，移除后重复计算后续前沿。最终名次
+按以下顺序稳定排序：预算层、Pareto 前沿、综合分降序、每百元价值降序、有效成本升序、Product ID。
+完整并列时 Product ID 只承担可复现的决胜，不表达业务偏好。
+
+最终候选快照与 `candidates_scored` 事件必须在一个 SQLite Session/事务中提交。事务只读取当前请求、
+当前工作流的规范事实和核验记录，以及通过请求 Evidence 明确绑定的 Product 与 Offer；不能把其他请求
+或旧工作流的数据混入。没有候选、状态错误、模型校验、外键或并发修订失败时全部回滚，工作流保持在
+`data_normalized`。边际升级价值属于 M5 报告解释层，可由这些已保存指标计算，但不得反向改写 M4 名次。
 
 ## 6. 确定性工作流
 

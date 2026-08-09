@@ -3,7 +3,18 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, MetaData, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    MetaData,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 NAMING_CONVENTION = {
@@ -153,6 +164,47 @@ class NormalizedSpecificationRecord(Base):
     status: Mapped[str] = mapped_column(String(64), nullable=False)
     canonical_unit: Mapped[str | None] = mapped_column(String(40))
     normalized_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class CandidateScoreRecord(Base):
+    """Auditable final M4 candidate score linked to one workflow and product."""
+
+    __tablename__ = "candidate_scores"
+    __table_args__ = (
+        UniqueConstraint(
+            "workflow_id",
+            "product_id",
+            name="uq_candidate_scores_workflow_id_product_id",
+        ),
+        Index(
+            "ix_candidate_scores_request_eligible_rank",
+            "request_id",
+            "eligible",
+            "rank",
+        ),
+        Index(
+            "ix_candidate_scores_workflow_pareto",
+            "workflow_id",
+            "pareto_front",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    request_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_requests.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    eligible: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    rank: Mapped[int | None] = mapped_column(Integer)
+    pareto_front: Mapped[int | None] = mapped_column(Integer)
+    final_score: Mapped[str | None] = mapped_column(String(40))
+    scored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
