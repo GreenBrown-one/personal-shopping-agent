@@ -177,3 +177,22 @@ def test_product_offer_and_evidence_keep_distinct_contexts() -> None:
     assert offer.product_id == product.id
     assert offer.price.comparison_price[0] is PriceKind.ESTIMATED_TOTAL
     assert evidence.id in product.specifications[0].evidence_ids
+
+
+def test_evidence_allows_unassessed_confidence_and_tracks_origin_observation() -> None:
+    observation_id = uuid4()
+    evidence = Evidence(
+        subject_type=EvidenceSubjectType.OFFER,
+        subject_id=uuid4(),
+        field_path="price.displayed_price",
+        source_type=EvidenceSourceType.PLATFORM_LISTING,
+        source_url=HttpUrl("https://example.com/item/1"),
+        source_title="Example listing",
+        captured_at=CAPTURED_AT,
+        origin_observation_id=observation_id,
+        observed_value=Decimal("3999"),
+    )
+
+    assert evidence.origin_observation_id == observation_id
+    assert evidence.reliability is None
+    assert evidence.freshness is None

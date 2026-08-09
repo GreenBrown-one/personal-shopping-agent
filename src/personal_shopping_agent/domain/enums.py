@@ -21,6 +21,7 @@ class EvidenceSourceType(StrEnum):
     BRAND_FLAGSHIP = "brand_flagship"
     AUTHORIZED_RETAILER = "authorized_retailer"
     THIRD_PARTY_SELLER = "third_party_seller"
+    PLATFORM_LISTING = "platform_listing"
     INDEPENDENT_REVIEW = "independent_review"
     USER_COMMENT = "user_comment"
     SEARCH_SNIPPET = "search_snippet"

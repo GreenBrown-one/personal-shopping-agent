@@ -45,6 +45,50 @@ def domain_payload(model: BaseModel) -> dict[str, object]:
     return cast(dict[str, object], model.model_dump(mode="json"))
 
 
+def product_record(product: Product) -> ProductRecord:
+    """Map one validated Product to its indexed persistence record."""
+
+    return ProductRecord(
+        id=str(product.id),
+        brand=product.brand,
+        model=product.model,
+        category=product.category,
+        canonical_name=product.canonical_name,
+        payload=domain_payload(product),
+    )
+
+
+def offer_record(offer: Offer) -> OfferRecord:
+    """Map one validated Offer to its time- and context-indexed record."""
+
+    return OfferRecord(
+        id=str(offer.id),
+        product_id=str(offer.product_id),
+        platform=offer.platform,
+        seller=offer.seller,
+        sku=offer.sku,
+        variant=offer.variant,
+        region=offer.region,
+        captured_at=offer.captured_at,
+        payload=domain_payload(offer),
+    )
+
+
+def evidence_record(evidence: Evidence) -> EvidenceRecord:
+    """Map one validated Evidence observation to its indexed record."""
+
+    return EvidenceRecord(
+        id=str(evidence.id),
+        subject_type=evidence.subject_type.value,
+        subject_id=str(evidence.subject_id),
+        field_path=evidence.field_path,
+        source_type=evidence.source_type.value,
+        source_url=str(evidence.source_url),
+        captured_at=evidence.captured_at,
+        payload=domain_payload(evidence),
+    )
+
+
 class SQLiteShoppingRepository:
     """Persistence adapter for the core M1 domain objects."""
 
@@ -91,16 +135,7 @@ class SQLiteShoppingRepository:
     def add_product(self, product: Product) -> None:
         """Persist stable product identity without offer pricing."""
 
-        self._insert(
-            ProductRecord(
-                id=str(product.id),
-                brand=product.brand,
-                model=product.model,
-                category=product.category,
-                canonical_name=product.canonical_name,
-                payload=domain_payload(product),
-            )
-        )
+        self._insert(product_record(product))
 
     def get_product(self, product_id: UUID) -> Product:
         """Load and revalidate stable product identity."""
@@ -111,19 +146,7 @@ class SQLiteShoppingRepository:
     def add_offer(self, offer: Offer) -> None:
         """Persist a time-specific offer linked to an existing product."""
 
-        self._insert(
-            OfferRecord(
-                id=str(offer.id),
-                product_id=str(offer.product_id),
-                platform=offer.platform,
-                seller=offer.seller,
-                sku=offer.sku,
-                variant=offer.variant,
-                region=offer.region,
-                captured_at=offer.captured_at,
-                payload=domain_payload(offer),
-            )
-        )
+        self._insert(offer_record(offer))
 
     def get_offer(self, offer_id: UUID) -> Offer:
         """Load and revalidate an offer snapshot."""
@@ -146,18 +169,7 @@ class SQLiteShoppingRepository:
     def add_evidence(self, evidence: Evidence) -> None:
         """Persist one observation without replacing possible conflicts."""
 
-        self._insert(
-            EvidenceRecord(
-                id=str(evidence.id),
-                subject_type=evidence.subject_type.value,
-                subject_id=str(evidence.subject_id),
-                field_path=evidence.field_path,
-                source_type=evidence.source_type.value,
-                source_url=str(evidence.source_url),
-                captured_at=evidence.captured_at,
-                payload=domain_payload(evidence),
-            )
-        )
+        self._insert(evidence_record(evidence))
 
     def get_evidence(self, evidence_id: UUID) -> Evidence:
         """Load and revalidate one evidence observation."""

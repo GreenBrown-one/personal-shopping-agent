@@ -9,6 +9,13 @@ from personal_shopping_agent.application.collection import (
     SearchDetailUnitOfWork,
     SearchDetailUnitOfWorkFactory,
 )
+from personal_shopping_agent.application.conversion import (
+    ConvertedDetailBatch,
+    DetailConversionError,
+    DetailObservationConverter,
+    NoDetailObservationsError,
+    evidence_source_for_store,
+)
 from personal_shopping_agent.application.details import (
     PlatformDetailAdapter,
     PlatformDetailParseError,
@@ -25,6 +32,12 @@ from personal_shopping_agent.application.discovery import (
     PlatformCandidate,
     PlatformSearchAdapter,
     PlatformSearchResult,
+)
+from personal_shopping_agent.application.ingestion import (
+    OfferIngestionResult,
+    OfferIngestionService,
+    OfferIngestionUnitOfWork,
+    OfferIngestionUnitOfWorkFactory,
 )
 from personal_shopping_agent.application.observations import (
     DetailObservation,
@@ -50,9 +63,17 @@ __all__ = [
     "CandidateDiscovery",
     "CandidateDiscoveryService",
     "CollectedPage",
+    "ConvertedDetailBatch",
+    "DetailConversionError",
     "DetailObservation",
+    "DetailObservationConverter",
     "InvalidWorkflowTransitionError",
     "NoCandidatesDiscoveredError",
+    "NoDetailObservationsError",
+    "OfferIngestionResult",
+    "OfferIngestionService",
+    "OfferIngestionUnitOfWork",
+    "OfferIngestionUnitOfWorkFactory",
     "PageCollector",
     "PlatformAccessRestrictedError",
     "PlatformCandidate",
@@ -79,5 +100,6 @@ __all__ = [
     "WorkflowSnapshot",
     "WorkflowState",
     "WorkflowStateMachine",
+    "evidence_source_for_store",
     "next_workflow_state",
 ]

@@ -198,7 +198,8 @@ class Evidence(DomainModel):
     source_url: HttpUrl
     source_title: str = Field(min_length=1, max_length=500)
     captured_at: AwareDatetime = Field(default_factory=utc_now)
+    origin_observation_id: UUID | None = None
     observed_value: ScalarValue | None = None
-    reliability: Decimal = Field(ge=0, le=1)
-    freshness: Decimal = Field(ge=0, le=1)
+    reliability: Decimal | None = Field(default=None, ge=0, le=1)
+    freshness: Decimal | None = Field(default=None, ge=0, le=1)
     notes: str | None = Field(default=None, max_length=2_000)
