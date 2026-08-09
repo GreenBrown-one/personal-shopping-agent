@@ -23,6 +23,7 @@ htmlcov/
 # Local application state and potentially sensitive browser artifacts.
 data/*.db
 data/*.sqlite*
+data/browser-profiles/
 artifacts/
 reports/
 screenshots/

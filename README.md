@@ -2,7 +2,7 @@
 
 一个面向个人消费者的、证据驱动的购物决策助手。它的目标不是替用户下单，而是把分散的商品参数、报价、适用条件和证据整理成可复核的比较结果。
 
-> 当前状态：Milestone 2（MCP 与确定性编排）正在建设。本仓库暂未包含网页采集、跨平台报价或推荐算法。
+> 当前状态：M0–M2 已完成；M3 正在建设受控浏览器和平台适配器。当前仍未启用真实购物平台采集、跨平台报价或推荐算法。
 
 ## 产品边界
 
@@ -29,6 +29,7 @@
 
 ```bash
 uv sync --locked --dev
+uv run playwright install chromium
 uv run python -m personal_shopping_agent
 uv run alembic upgrade head
 uv run personal-shopping-agent-mcp
@@ -60,6 +61,8 @@ M1 提供严格校验的 `ShoppingRequest`、`Product`、`Offer` 和 `Evidence` 
 
 M2 增加官方 MCP Python SDK v2 服务和可审计状态机。AI 主机现在可以创建结构化购物任务、查询任务进度和检查当前能力；任务只能按设计顺序推进，不能跳过阶段。M3/M4 接入平台数据和排序后，内部编排器会在实际步骤成功后推进状态。
 
+M3 的第一个安全切片增加受控 Playwright Chromium 生命周期和安全导航策略：浏览器使用未纳入版本控制的专用本地资料目录，只允许显式白名单中的公开 HTTPS 主机，拒绝私网地址、非标准端口、URL 内嵌凭据、下载以及结算/订单/支付路径。页面只以有大小上限的 HTML 快照交给后续平台解析器；测试使用替身，不访问真实购物网站。
+
 当前暴露的 MCP 工具：
 
 - `shopping_agent_status`：查询已实现与尚未实现的能力；
@@ -67,6 +70,8 @@ M2 增加官方 MCP Python SDK v2 服务和可审计状态机。AI 主机现在�
 - `get_shopping_workflow`：读取请求、当前状态和完整审计事件。
 
 这些工具不会访问购物平台、下单或支付。
+
+当前的浏览器基础层尚未注册为 MCP 工具，也没有默认平台白名单。京东搜索与详情适配器完成并通过平台访问边界核对前，`shopping_agent_status` 会继续如实报告 `platform_collection=false`。
 
 ## 许可
 
