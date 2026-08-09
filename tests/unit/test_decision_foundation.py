@@ -668,4 +668,6 @@ def test_candidate_foundation_rejects_inconsistent_aggregates() -> None:
     )
     for fields, message in invalid:
         with pytest.raises(ValidationError, match=message):
-            CandidateScoringFoundation.model_validate({"product_id": product_id} | fields)
+            CandidateScoringFoundation.model_validate(
+                {"request_id": uuid4(), "product_id": product_id} | fields
+            )
