@@ -75,6 +75,7 @@ def _evidence(
 ) -> Evidence:
     detail = observation.detail
     return Evidence(
+        request_id=observation.request_id,
         subject_type=subject_type,
         subject_id=subject_id,
         field_path=field_path,

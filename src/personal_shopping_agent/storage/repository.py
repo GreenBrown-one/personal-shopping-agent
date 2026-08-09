@@ -79,6 +79,7 @@ def evidence_record(evidence: Evidence) -> EvidenceRecord:
 
     return EvidenceRecord(
         id=str(evidence.id),
+        request_id=str(evidence.request_id) if evidence.request_id is not None else None,
         subject_type=evidence.subject_type.value,
         subject_id=str(evidence.subject_id),
         field_path=evidence.field_path,

@@ -3,6 +3,9 @@
 from personal_shopping_agent.storage.collection_unit_of_work import (
     SQLiteSearchDetailUnitOfWork,
 )
+from personal_shopping_agent.storage.cross_check_unit_of_work import (
+    SQLiteEvidenceCrossCheckUnitOfWork,
+)
 from personal_shopping_agent.storage.database import (
     create_schema,
     create_session_factory,
@@ -33,6 +36,7 @@ __all__ = [
     "EntityNotFoundError",
     "InvalidReferenceError",
     "ObservationKindMismatchError",
+    "SQLiteEvidenceCrossCheckUnitOfWork",
     "SQLiteOfferIngestionUnitOfWork",
     "SQLitePlatformObservationRepository",
     "SQLiteSearchDetailUnitOfWork",
