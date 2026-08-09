@@ -31,6 +31,16 @@ from personal_shopping_agent.application.cross_check import (
     OfficialSpecificationObservation,
     ProductEvidenceChecker,
 )
+from personal_shopping_agent.application.decision import (
+    CandidateScoringFoundation,
+    CandidateScoringFoundationBuilder,
+    CriterionEvaluation,
+    CriterionEvaluationStatus,
+    CriterionEvaluator,
+    InvalidCriterionDefinitionError,
+    OfferCostAssessment,
+    OfferCostEstimator,
+)
 from personal_shopping_agent.application.details import (
     PlatformDetailAdapter,
     PlatformDetailParseError,
@@ -91,8 +101,13 @@ from personal_shopping_agent.application.workflow import (
 __all__ = [
     "CandidateDiscovery",
     "CandidateDiscoveryService",
+    "CandidateScoringFoundation",
+    "CandidateScoringFoundationBuilder",
     "CollectedPage",
     "ConvertedDetailBatch",
+    "CriterionEvaluation",
+    "CriterionEvaluationStatus",
+    "CriterionEvaluator",
     "DetailConversionError",
     "DetailObservation",
     "DetailObservationConverter",
@@ -103,6 +118,7 @@ __all__ = [
     "EvidenceCrossCheckService",
     "EvidenceCrossCheckUnitOfWork",
     "EvidenceCrossCheckUnitOfWorkFactory",
+    "InvalidCriterionDefinitionError",
     "InvalidWorkflowTransitionError",
     "MeasurementDefinition",
     "NoCandidatesDiscoveredError",
@@ -110,6 +126,8 @@ __all__ = [
     "NoProductsForEvidenceCheckError",
     "NoSpecificationsForNormalizationError",
     "NormalizedSpecification",
+    "OfferCostAssessment",
+    "OfferCostEstimator",
     "OfferIngestionResult",
     "OfferIngestionService",
     "OfferIngestionUnitOfWork",
