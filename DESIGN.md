@@ -141,6 +141,27 @@ Product、Offer、Evidence 与 `offers_collected` 审计事件必须在一个 SQ
 
 所有中间量必须限制在定义域内，并在报告中解释权重、缺失处理和惩罚原因。
 
+### 5.1 规格规范化
+
+M4 首个切片把请求关联的 Product 规格 Evidence 转换为追加式 `NormalizedSpecification`，不修改或
+覆盖原 Evidence。每条结果保留 Product、请求、工作流、原字段路径、所有不同原值、证据 ID、规范
+字段、规范单位、所有不同规范值、处理状态和时间。初始规范字段限于：
+
+- `battery_capacity`，统一为 `mAh`；
+- `weight`，统一为 `g`；
+- `display_size`，统一为 `inch`；
+- `storage_capacity` 与 `memory_capacity`，统一为 `GB`，容量换算采用二进制口径
+  `1 TB = 1024 GB`、`1 MB = 1/1024 GB`。
+
+字段只接受声明过的中英文精确别名；数值只接受完整的非负“数字 + 单位”表达。系统不得从上下文
+补单位、解释“约”“大概”等模糊词或猜测未知字段含义。单位换算后的唯一值标记为 `normalized`；
+多个不同值标记为 `conflict`；已知字段但任一原值无法完整解析时标记为 `unparseable_value`；未知字段
+标记为 `unsupported_key`。冲突和解析失败仍可保存已经确定的换算结果，但不能伪装成单一确定事实。
+
+规范化只允许从 `evidence_cross_checked` 进入。所有规范结果与 `data_normalized` 工作流事件必须在
+同一 SQLite 事务内提交；没有任何规格 Evidence、领域校验、外键或并发修订失败时全部回滚。完成
+表示规范化过程已执行并显式记录缺失/冲突，不表示每个字段都有确定值。
+
 对于用户准则 `i`，权重为 `w_i`、归一化能力分为 `s_i ∈ [0,1]`：
 
 ```text

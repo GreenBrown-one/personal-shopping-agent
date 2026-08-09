@@ -21,6 +21,7 @@ def test_initial_migration_upgrades_and_downgrades(tmp_path: Path) -> None:
         "alembic_version",
         "evidence_items",
         "evidence_checks",
+        "normalized_specifications",
         "offers",
         "platform_observations",
         "products",
@@ -43,11 +44,18 @@ def test_initial_migration_upgrades_and_downgrades(tmp_path: Path) -> None:
         "shopping_requests",
         "shopping_workflows",
     }
+    assert {
+        item["referred_table"] for item in inspector.get_foreign_keys("normalized_specifications")
+    } == {
+        "products",
+        "shopping_requests",
+        "shopping_workflows",
+    }
     assert inspector.get_foreign_keys("evidence_items")[0]["referred_table"] == (
         "shopping_requests"
     )
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260809_0004"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260809_0005"
     engine.dispose()
 
     command.downgrade(config, "base")

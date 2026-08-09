@@ -15,6 +15,9 @@ from personal_shopping_agent.storage.database import (
 from personal_shopping_agent.storage.ingestion_unit_of_work import (
     SQLiteOfferIngestionUnitOfWork,
 )
+from personal_shopping_agent.storage.normalization_unit_of_work import (
+    SQLiteSpecificationNormalizationUnitOfWork,
+)
 from personal_shopping_agent.storage.observation_repository import (
     ObservationKindMismatchError,
     SQLitePlatformObservationRepository,
@@ -41,6 +44,7 @@ __all__ = [
     "SQLitePlatformObservationRepository",
     "SQLiteSearchDetailUnitOfWork",
     "SQLiteShoppingRepository",
+    "SQLiteSpecificationNormalizationUnitOfWork",
     "SQLiteWorkflowRepository",
     "create_schema",
     "create_session_factory",
