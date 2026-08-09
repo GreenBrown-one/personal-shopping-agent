@@ -2,7 +2,7 @@
 
 一个面向个人消费者的、证据驱动的购物决策助手。它的目标不是替用户下单，而是把分散的商品参数、报价、适用条件和证据整理成可复核的比较结果。
 
-> 当前状态：M0–M2 已完成；M3 已具备受控浏览器、安全导航、低频访问协调、京东搜索与详情解析、结构化观察存储、请求级事务、严格领域转换和官方证据核验事务；M4 已具备确定性规格规范化、条件效用、报价不确定性调整成本、证据置信度、预算分层、Pareto 前沿和最终排名；M5 已具备不依赖 LLM 的可审计 Markdown 报告、原子持久化，以及受事实白名单约束的 OpenAI 与 DeepSeek 可选解释适配器。真实购物平台或厂商页面采集、跨平台报价、HTML 报告及 MCP 运行装配仍未启用。
+> 当前状态：M0–M2 已完成；M3 已具备受控浏览器、安全导航、低频访问协调、京东搜索与详情解析、结构化观察存储、请求级事务、严格领域转换和官方证据核验事务；M4 已具备确定性规格规范化、条件效用、报价不确定性调整成本、证据置信度、预算分层、Pareto 前沿和最终排名；M5 已具备不依赖 LLM 的可审计 Markdown 报告、原子持久化、受事实白名单约束的 OpenAI/DeepSeek 解释适配器，以及默认关闭的运行时选择与安全展示层。真实购物平台或厂商页面采集、跨平台报价、HTML 报告及 MCP 端到端运行装配仍未启用。
 
 ## 产品边界
 
@@ -53,25 +53,37 @@ OpenAI 与 DeepSeek 只为已经生成的确定性报告补充自然语言解释
 `deterministic_fallback`。
 
 API 密钥只在运行时传入，不写入配置文件、数据库或报告。模型名要求显式提供，以免代码把会变化的
-供应商默认值固定下来。示例：
+供应商默认值固定下来。默认 `PERSONAL_SHOPPING_LLM_PROVIDER=disabled`；只有明确选择 `openai` 或
+`deepseek` 时才读取对应密钥。示例：
 
 ```python
-import os
+from personal_shopping_agent.llm import create_report_presentation_service_from_environment
 
-from personal_shopping_agent.llm import (
-    DeepSeekReportExplanationAdapter,
-    OpenAIReportExplanationAdapter,
-)
-
-openai_explainer = OpenAIReportExplanationAdapter(
-    api_key=os.environ["OPENAI_API_KEY"],
-    model=os.environ["OPENAI_MODEL"],
-)
-deepseek_explainer = DeepSeekReportExplanationAdapter(
-    api_key=os.environ["DEEPSEEK_API_KEY"],
-    model=os.environ["DEEPSEEK_MODEL"],
-)
+presentation_service = create_report_presentation_service_from_environment()
+presentation = presentation_service.present(rendered_report)
 ```
+
+OpenAI 运行变量：
+
+```text
+PERSONAL_SHOPPING_LLM_PROVIDER=openai
+OPENAI_API_KEY=<runtime secret>
+PERSONAL_SHOPPING_OPENAI_MODEL=<explicit model name>
+```
+
+DeepSeek 运行变量：
+
+```text
+PERSONAL_SHOPPING_LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=<runtime secret>
+PERSONAL_SHOPPING_DEEPSEEK_MODEL=<explicit model name>
+```
+
+两者共用的可选限制为 `PERSONAL_SHOPPING_LLM_TIMEOUT_SECONDS`（默认 30，最大 120）、
+`PERSONAL_SHOPPING_LLM_MAX_OUTPUT_TOKENS`（默认 2000，范围 256–4096）和
+`PERSONAL_SHOPPING_LLM_MAX_CANDIDATES`（默认 3，范围 1–10）。非法配置只返回脱敏错误码，不发起
+API 请求。成功解释会作为经过 Markdown 转义、带事实 ID 与内容哈希的附加章节；关闭模型或调用失败
+时，最终展示内容与原确定性报告逐字节一致。
 
 DeepSeek 适配器是纯文本解释器，因此不要求模型具备视觉能力。商品图片或页面视觉信息若未来需要
 处理，应由受控采集/视觉层先转换为带来源的结构化事实，再进入报告；解释器不能直接看图后改写排名。
@@ -124,6 +136,13 @@ Outputs 和 DeepSeek OpenAI 兼容 JSON Output 适配器。默认请求只投影
 提醒必须引用这些 ID。OpenAI 返回 Pydantic 结构，DeepSeek 返回 JSON 后在本地执行同一结构校验；
 两者都还要通过报告 ID/哈希、候选范围与顺序、跨商品引用和固定免责声明检查。该解释是非持久化的
 可选覆盖层，不推进工作流、不替代确定性报告，也不获得浏览、下单或支付能力。
+
+M5 的第三个切片增加默认关闭的运行时配置和安全展示服务。系统通过
+`PERSONAL_SHOPPING_LLM_PROVIDER` 在关闭、OpenAI 与 DeepSeek 之间显式选择，只读取被选中提供方的
+密钥和模型名；密钥使用 `SecretStr` 留在内存，并从模型导出和对象表示中排除。配置合法后，组合工厂
+创建相应适配器、事实请求构建器和展示服务。经过验证的模型文本会先转义，再作为带事实 ID、提供方、
+模型名和新 SHA-256 的 Markdown 章节追加在确定性报告之后；回退展示必须与原报告内容及哈希完全一致。
+该切片仍未把报告/解释流程注册成 MCP 工具，真实 API 调用也只会在未来运行装配后由用户显式启用。
 
 淘宝/天猫和拼多多只作为未来适配器候选保留，不在 v1.0 同时接入。当前顺序是先把京东搜索、详情、地区价格、库存语境和证据链做完整，再评估第二个平台，避免在多套不稳定页面结构上过早摊薄测试与维护投入。
 

@@ -1,5 +1,8 @@
 """Provider-neutral, fact-scoped explanations for deterministic shopping reports."""
 
+# ruff: noqa: RUF001 -- Chinese user-facing copy intentionally uses full-width punctuation.
+
+import hashlib
 import re
 from decimal import Decimal
 from enum import StrEnum
@@ -8,7 +11,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from personal_shopping_agent.application.reporting import RenderedShoppingReport, ReportCandidate
+from personal_shopping_agent.application.reporting import (
+    RenderedShoppingReport,
+    ReportCandidate,
+    ReportFormat,
+    escape_markdown,
+)
 from personal_shopping_agent.domain import Money
 
 EXPLANATION_SCHEMA_VERSION = "m5-explanation-v1"
@@ -136,6 +144,7 @@ class ShoppingReportExplanationResult(ExplanationModel):
 
     rendered: RenderedShoppingReport
     status: ExplanationStatus
+    request: ReportExplanationRequest | None = None
     explanation: ShoppingReportExplanation | None = None
     provider_name: str | None = Field(default=None, min_length=1, max_length=80)
     model_name: str | None = Field(default=None, min_length=1, max_length=160)
@@ -147,19 +156,56 @@ class ShoppingReportExplanationResult(ExplanationModel):
 
         explained = self.status is ExplanationStatus.EXPLAINED
         has_provider_output = (
-            self.explanation is not None
+            self.request is not None
+            and self.explanation is not None
             and self.provider_name is not None
             and self.model_name is not None
             and self.fallback_reason is None
         )
         fallback = (
-            self.explanation is None
+            self.request is None
+            and self.explanation is None
             and self.provider_name is None
             and self.model_name is None
             and self.fallback_reason is not None
         )
         if (explained and not has_provider_output) or (not explained and not fallback):
             raise ValueError("explanation result fields must match its status")
+        if has_provider_output:
+            assert self.request is not None
+            assert self.explanation is not None
+            expected_request = ReportExplanationRequestBuilder(
+                maximum_candidates=len(self.request.candidate_product_ids)
+            ).build(self.rendered)
+            if self.request != expected_request:
+                raise ValueError("explanation request must be the exact deterministic projection")
+            validate_explanation_scope(self.request, self.explanation)
+        return self
+
+
+class RenderedShoppingReportPresentation(ExplanationModel):
+    """Integrity-checked Markdown presentation with an optional explanation overlay."""
+
+    result: ShoppingReportExplanationResult
+    format: ReportFormat = ReportFormat.MARKDOWN
+    content: str = Field(min_length=1)
+    content_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def content_is_bound_to_result(self) -> Self:
+        """Require fallback identity or an append-only explanation presentation."""
+
+        expected_hash = hashlib.sha256(self.content.encode("utf-8")).hexdigest()
+        if self.content_sha256 != expected_hash:
+            raise ValueError("presented report hash must match its UTF-8 content")
+        base = self.result.rendered
+        if self.result.status is ExplanationStatus.DETERMINISTIC_FALLBACK:
+            if self.content != base.content or self.content_sha256 != base.content_sha256:
+                raise ValueError(
+                    "fallback presentation must exactly equal the deterministic report"
+                )
+        elif not self.content.startswith(f"{base.content}\n\n---\n\n"):
+            raise ValueError("explanation presentation must append to the deterministic report")
         return self
 
 
@@ -413,6 +459,86 @@ def validate_explanation_scope(
         )
 
 
+class MarkdownShoppingReportExplanationRenderer:
+    """Append validated LLM text as escaped, fact-cited Markdown."""
+
+    def render(
+        self,
+        result: ShoppingReportExplanationResult,
+    ) -> RenderedShoppingReportPresentation:
+        """Keep fallbacks byte-identical and make successful overlays visibly secondary."""
+
+        base = result.rendered
+        if result.status is ExplanationStatus.DETERMINISTIC_FALLBACK:
+            return RenderedShoppingReportPresentation(
+                result=result,
+                content=base.content,
+                content_sha256=base.content_sha256,
+            )
+
+        request = result.request
+        explanation = result.explanation
+        assert request is not None
+        assert explanation is not None
+        assert result.provider_name is not None
+        assert result.model_name is not None
+        validate_explanation_scope(request, explanation)
+        facts = {fact.id: fact for fact in request.facts}
+        product_names = {
+            candidate.product.id: candidate.product.canonical_name
+            for candidate in base.report.candidates
+        }
+        lines = [
+            base.content,
+            "",
+            "---",
+            "",
+            "## AI 辅助解释",
+            "",
+            "> 本节仅是对上方确定性报告的语言说明，不是新的事实来源，也不会改变排名。",
+            "",
+            f"- 提供方：{escape_markdown(result.provider_name)}",
+            f"- 模型：{escape_markdown(result.model_name)}",
+            f"- 解释输入版本：{escape_markdown(request.schema_version)}",
+            "",
+            "### 总览",
+            "",
+        ]
+        self._append_statement(lines, explanation.overview, facts)
+        lines.extend(("### 候选说明", ""))
+        for candidate in explanation.candidates:
+            lines.extend(
+                (
+                    f"#### {escape_markdown(product_names[candidate.product_id])}",
+                    "",
+                )
+            )
+            self._append_statement(lines, candidate.summary, facts)
+        lines.extend(("### 限制提醒", ""))
+        for caution in explanation.cautions:
+            self._append_statement(lines, caution, facts)
+        content = "\n".join(lines).rstrip()
+        return RenderedShoppingReportPresentation(
+            result=result,
+            content=content,
+            content_sha256=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+        )
+
+    @staticmethod
+    def _append_statement(
+        lines: list[str],
+        statement: ExplanationStatement,
+        facts: dict[str, ExplanationFact],
+    ) -> None:
+        lines.extend((escape_markdown(statement.text), "", "引用事实：", ""))
+        lines.extend(
+            f"- `{fact_id}` — {escape_markdown(facts[fact_id].label)}："
+            f"{escape_markdown(facts[fact_id].value)}"
+            for fact_id in statement.fact_ids
+        )
+        lines.append("")
+
+
 class ShoppingReportExplanationService:
     """Add an optional validated LLM overlay without changing the durable report."""
 
@@ -441,6 +567,7 @@ class ShoppingReportExplanationService:
         return ShoppingReportExplanationResult(
             rendered=rendered,
             status=ExplanationStatus.EXPLAINED,
+            request=request,
             explanation=explanation,
             provider_name=self._provider.provider_name,
             model_name=self._provider.model_name,
@@ -456,3 +583,21 @@ class ShoppingReportExplanationService:
             status=ExplanationStatus.DETERMINISTIC_FALLBACK,
             fallback_reason=reason,
         )
+
+
+class ShoppingReportPresentationService:
+    """Create a user-visible report while preserving the deterministic base."""
+
+    def __init__(
+        self,
+        explanation_service: ShoppingReportExplanationService,
+        *,
+        renderer: MarkdownShoppingReportExplanationRenderer | None = None,
+    ) -> None:
+        self._explanation_service = explanation_service
+        self._renderer = renderer or MarkdownShoppingReportExplanationRenderer()
+
+    def present(self, rendered: RenderedShoppingReport) -> RenderedShoppingReportPresentation:
+        """Explain if configured, then render a safe append-only presentation."""
+
+        return self._renderer.render(self._explanation_service.explain(rendered))
