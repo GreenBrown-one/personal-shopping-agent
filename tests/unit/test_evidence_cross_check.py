@@ -197,7 +197,7 @@ def test_checker_marks_any_multi_source_value_disagreement_as_conflict() -> None
     )
 
     check = next(item for item in batch.checks if item.field_path.endswith("battery"))
-    assert check.status is EvidenceCheckStatus.MATCH
+    assert check.status is EvidenceCheckStatus.CONFLICT
     assert check.platform_values == ("6000 mAh", "5900 mAh")
     assert check.official_values == ("6000 mAh", "5900 mAh")
 

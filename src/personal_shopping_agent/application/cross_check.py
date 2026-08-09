@@ -202,7 +202,7 @@ def _comparison_status(
         return EvidenceCheckStatus.PLATFORM_ONLY
     platform_normalized = {_normalized(value) for value in platform_values}
     official_normalized = {_normalized(value) for value in official_values}
-    if platform_normalized == official_normalized:
+    if len(platform_normalized) == 1 and platform_normalized == official_normalized:
         return EvidenceCheckStatus.MATCH
     return EvidenceCheckStatus.CONFLICT
 

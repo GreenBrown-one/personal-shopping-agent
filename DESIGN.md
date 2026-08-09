@@ -129,7 +129,7 @@ Product、Offer、Evidence 与 `offers_collected` 审计事件必须在一个 SQ
 
 核验以字段为单位追加保存 `match`、`conflict`、`platform_only`、`official_only` 或
 `missing_official_source`，并同时保留两侧原始值和官方来源 URL。比较阶段只折叠大小写与连续空白，
-不换算单位、不解析容量或重量，也不把部分交集视为完全一致；这些标准化规则属于 M4。官方来源
+不换算单位、不解析容量或重量，也不把部分交集或同侧多个不同值视为完全一致；这些标准化规则属于 M4。官方来源
 缺失不是核验通过，即使平台规格也缺失，仍保存 `official_source` 缺失记录以便复核。
 
 平台 Evidence 通过 `request_id` 绑定购物请求。官方 Evidence、字段级核验记录和
