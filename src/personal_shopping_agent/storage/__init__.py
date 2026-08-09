@@ -12,12 +12,18 @@ from personal_shopping_agent.storage.repository import (
     InvalidReferenceError,
     SQLiteShoppingRepository,
 )
+from personal_shopping_agent.storage.workflow_repository import (
+    ConcurrentWorkflowUpdateError,
+    SQLiteWorkflowRepository,
+)
 
 __all__ = [
+    "ConcurrentWorkflowUpdateError",
     "DuplicateEntityError",
     "EntityNotFoundError",
     "InvalidReferenceError",
     "SQLiteShoppingRepository",
+    "SQLiteWorkflowRepository",
     "create_schema",
     "create_session_factory",
     "create_sqlite_engine",

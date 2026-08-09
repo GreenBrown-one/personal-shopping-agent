@@ -14,6 +14,8 @@ These rules apply to every human or AI contributor.
 - Keep `Product` identity separate from seller/time/region-specific `Offer` data.
 - Platform adapters collect and translate data; they do not rank products.
 - LLM output is untrusted until validated by a typed schema. Core scoring and workflow transitions are deterministic.
+- Keep MCP functions thin: validate interface input, call an application use case, and return typed output.
+- Do not expose a generic MCP tool that lets a model claim workflow stages completed without the corresponding application step succeeding.
 
 ## Safety
 
@@ -28,4 +30,5 @@ These rules apply to every human or AI contributor.
 - Preserve conflicting observations instead of silently overwriting them.
 - Parser changes require sanitized fixtures and regression tests.
 - Ranking changes require unit tests and an explanation of user-visible effects.
+- MCP tool changes require an in-memory SDK client test and accurate read-only/destructive annotations.
 - Run `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`, and `uv run pytest` before publishing changes.

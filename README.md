@@ -2,7 +2,7 @@
 
 一个面向个人消费者的、证据驱动的购物决策助手。它的目标不是替用户下单，而是把分散的商品参数、报价、适用条件和证据整理成可复核的比较结果。
 
-> 当前状态：Milestone 1（领域与本地存储）正在建设。本仓库暂未包含网页采集、MCP 服务或推荐业务逻辑。
+> 当前状态：Milestone 2（MCP 与确定性编排）正在建设。本仓库暂未包含网页采集、跨平台报价或推荐算法。
 
 ## 产品边界
 
@@ -31,6 +31,7 @@
 uv sync --locked --dev
 uv run python -m personal_shopping_agent
 uv run alembic upgrade head
+uv run personal-shopping-agent-mcp
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .
@@ -56,6 +57,16 @@ uv run pyright
 ## 当前领域与存储能力
 
 M1 提供严格校验的 `ShoppingRequest`、`Product`、`Offer` 和 `Evidence` 模型，以及本地 SQLite 仓储。报价和商品身份分别存储，证据允许对同一字段保留多个相互冲突的观察。数据库结构通过 Alembic 迁移管理。
+
+M2 增加官方 MCP Python SDK v2 服务和可审计状态机。AI 主机现在可以创建结构化购物任务、查询任务进度和检查当前能力；任务只能按设计顺序推进，不能跳过阶段。M3/M4 接入平台数据和排序后，内部编排器会在实际步骤成功后推进状态。
+
+当前暴露的 MCP 工具：
+
+- `shopping_agent_status`：查询已实现与尚未实现的能力；
+- `start_shopping_workflow`：把已结构化需求保存为本地购物任务；
+- `get_shopping_workflow`：读取请求、当前状态和完整审计事件。
+
+这些工具不会访问购物平台、下单或支付。
 
 ## 许可
 

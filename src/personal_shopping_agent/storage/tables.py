@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, MetaData, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, MetaData, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 NAMING_CONVENTION = {
@@ -85,4 +85,43 @@ class EvidenceRecord(Base):
     source_type: Mapped[str] = mapped_column(String(64), nullable=False)
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
     captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class WorkflowRecord(Base):
+    """Current orchestration state linked to one validated shopping request."""
+
+    __tablename__ = "shopping_workflows"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    request_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_requests.id", ondelete="CASCADE"), nullable=False
+    )
+    state: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    revision: Mapped[int] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(120))
+    error_message: Mapped[str | None] = mapped_column(String(1_000))
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class WorkflowEventRecord(Base):
+    """Append-only ordered workflow transition audit record."""
+
+    __tablename__ = "workflow_events"
+    __table_args__ = (
+        UniqueConstraint("workflow_id", "sequence", name="uq_workflow_events_workflow_id_sequence"),
+        Index("ix_workflow_events_workflow_sequence", "workflow_id", "sequence"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    sequence: Mapped[int] = mapped_column(nullable=False)
+    from_state: Mapped[str | None] = mapped_column(String(64))
+    to_state: Mapped[str] = mapped_column(String(64), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(String(240), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
