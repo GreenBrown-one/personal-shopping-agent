@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from types import TracebackType
+from typing import cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -14,6 +15,7 @@ from personal_shopping_agent.application import (
     BudgetStatus,
     CandidateDecisionInput,
     CandidateEvidenceConfidence,
+    CandidateExplanation,
     CandidateRankingBatch,
     CandidateRankingEngine,
     CandidateScore,
@@ -21,22 +23,34 @@ from personal_shopping_agent.application import (
     CriterionEvaluation,
     CriterionEvaluationStatus,
     CriterionEvidenceAssessment,
+    ExplanationFact,
+    ExplanationFallbackReason,
+    ExplanationStatement,
+    ExplanationStatus,
+    InvalidExplanationOutputError,
     InvalidWorkflowTransitionError,
     MarkdownShoppingReportRenderer,
     NoCandidateScoresForReportError,
     OfferCostAssessment,
     RenderedShoppingReport,
     ReportCandidate,
+    ReportExplanationProviderError,
+    ReportExplanationRequest,
+    ReportExplanationRequestBuilder,
     ReportFormat,
     ReportInputMismatchError,
     ShoppingDecisionReport,
     ShoppingReportBuilder,
+    ShoppingReportExplanation,
+    ShoppingReportExplanationResult,
+    ShoppingReportExplanationService,
     ShoppingReportService,
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
     WorkflowState,
     WorkflowStateMachine,
+    validate_explanation_scope,
 )
 from personal_shopping_agent.domain import (
     Budget,
@@ -574,3 +588,290 @@ def test_service_rolls_back_report_and_state_when_staging_fails() -> None:
 
     assert unit.exited and unit.rolled_back and not unit.committed
     assert unit.transition is None
+
+
+def build_explanation(request: ReportExplanationRequest) -> ShoppingReportExplanation:
+    candidate_explanations = tuple(
+        CandidateExplanation(
+            product_id=product_id,
+            summary=ExplanationStatement(
+                text="该候选的解释只引用报告事实。",
+                fact_ids=(f"candidate.{product_id}.name",),
+            ),
+        )
+        for product_id in request.candidate_product_ids
+    )
+    return ShoppingReportExplanation(
+        report_id=request.report_id,
+        report_content_sha256=request.report_content_sha256,
+        overview=ExplanationStatement(
+            text="这是确定性报告的可选语言说明。",
+            fact_ids=("report.recommendation",),
+        ),
+        candidates=candidate_explanations,
+        cautions=(
+            ExplanationStatement(
+                text="购买前仍需在平台复核。",
+                fact_ids=("report.disclaimer",),
+            ),
+        ),
+    )
+
+
+def explanation_request(*, maximum_candidates: int = 3) -> ReportExplanationRequest:
+    fixture = build_fixture(amounts=("80", "151", None))
+    rendered = MarkdownShoppingReportRenderer().render(build_report(fixture))
+    return ReportExplanationRequestBuilder(maximum_candidates=maximum_candidates).build(rendered)
+
+
+def test_explanation_request_builder_projects_bounded_exact_facts() -> None:
+    request = explanation_request(maximum_candidates=2)
+
+    assert len(request.candidate_product_ids) == 2
+    assert request.recommended_product_id == request.candidate_product_ids[0]
+    assert "report.disclaimer" in {fact.id for fact in request.facts}
+    assert all("http" not in fact.value for fact in request.facts)
+    assert any(fact.value == "未提供" for fact in request.facts)
+    assert any(fact.value == "未排名" for fact in request.facts)
+    assert any(fact.value == "over_budget" for fact in request.facts)
+
+
+def test_explanation_request_builder_handles_no_recommendation_and_no_stretch_budget() -> None:
+    fixture = build_fixture(
+        amounts=(None,),
+        request=build_request(include_stretch=False),
+    )
+    rendered = MarkdownShoppingReportRenderer().render(build_report(fixture))
+
+    request = ReportExplanationRequestBuilder(maximum_candidates=1).build(rendered)
+
+    assert request.recommended_product_id is None
+    assert next(fact for fact in request.facts if fact.id == "report.budget.stretch").value == (
+        "未提供"
+    )
+    assert (
+        next(fact for fact in request.facts if fact.id.endswith("selected_price")).value == "未提供"
+    )
+
+
+@pytest.mark.parametrize("maximum_candidates", [0, 11])
+def test_explanation_request_builder_rejects_invalid_candidate_limit(
+    maximum_candidates: int,
+) -> None:
+    with pytest.raises(ValueError, match="between 1 and 10"):
+        ReportExplanationRequestBuilder(maximum_candidates=maximum_candidates)
+
+
+def base_request_parts() -> dict[str, object]:
+    product_id = uuid4()
+    return {
+        "report_id": uuid4(),
+        "report_content_sha256": "a" * 64,
+        "candidate_product_ids": (product_id,),
+        "recommended_product_id": product_id,
+        "facts": (
+            ExplanationFact(
+                id="report.disclaimer",
+                label="限制",
+                value="请复核",
+            ),
+            ExplanationFact(
+                id=f"candidate.{product_id}.name",
+                label="名称",
+                value="Example",
+                candidate_product_id=product_id,
+            ),
+        ),
+    }
+
+
+def test_explanation_request_rejects_inconsistent_scopes() -> None:
+    parts = base_request_parts()
+    product_id = cast(tuple[UUID, ...], parts["candidate_product_ids"])[0]
+    with pytest.raises(ValidationError, match="must be unique"):
+        ReportExplanationRequest.model_validate(
+            {**parts, "candidate_product_ids": (product_id, product_id)}
+        )
+
+    with pytest.raises(ValidationError, match="recommendation must be inside"):
+        ReportExplanationRequest.model_validate({**parts, "recommended_product_id": uuid4()})
+
+    facts = cast(tuple[ExplanationFact, ...], parts["facts"])
+    with pytest.raises(ValidationError, match="Fact identifiers must be unique"):
+        ReportExplanationRequest.model_validate({**parts, "facts": (*facts, facts[0])})
+
+    other_id = uuid4()
+    outside_fact = ExplanationFact(
+        id=f"candidate.{other_id}.name",
+        label="名称",
+        value="Outside",
+        candidate_product_id=other_id,
+    )
+    with pytest.raises(ValidationError, match="inside candidate scope"):
+        ReportExplanationRequest.model_validate({**parts, "facts": (*facts, outside_fact)})
+
+    with pytest.raises(ValidationError, match="cover every candidate"):
+        ReportExplanationRequest.model_validate({**parts, "facts": (facts[0],)})
+
+    with pytest.raises(ValidationError, match="include the deterministic disclaimer"):
+        ReportExplanationRequest.model_validate({**parts, "facts": (facts[1],)})
+
+
+def test_explanation_statement_rejects_links_and_duplicate_fact_ids() -> None:
+    with pytest.raises(ValidationError, match="must not contain links"):
+        ExplanationStatement(text="访问 https://example.com", fact_ids=("report.disclaimer",))
+    with pytest.raises(ValidationError, match="must be unique"):
+        ExplanationStatement(
+            text="重复引用",
+            fact_ids=("report.disclaimer", "report.disclaimer"),
+        )
+
+
+def test_validate_explanation_scope_accepts_exact_output() -> None:
+    request = explanation_request(maximum_candidates=2)
+    explanation = build_explanation(request)
+
+    validate_explanation_scope(request, explanation)
+
+
+def test_validate_explanation_scope_rejects_snapshot_and_candidate_changes() -> None:
+    request = explanation_request(maximum_candidates=2)
+    explanation = build_explanation(request)
+    with pytest.raises(InvalidExplanationOutputError, match="exact report"):
+        validate_explanation_scope(
+            request,
+            explanation.model_copy(update={"report_id": uuid4()}),
+        )
+    with pytest.raises(InvalidExplanationOutputError, match="scope and order"):
+        validate_explanation_scope(
+            request,
+            explanation.model_copy(update={"candidates": tuple(reversed(explanation.candidates))}),
+        )
+
+
+def test_validate_explanation_scope_rejects_unknown_and_cross_candidate_facts() -> None:
+    request = explanation_request(maximum_candidates=2)
+    explanation = build_explanation(request)
+    first, second = explanation.candidates
+
+    unknown = first.model_copy(
+        update={"summary": first.summary.model_copy(update={"fact_ids": ("unknown.fact",)})}
+    )
+    with pytest.raises(InvalidExplanationOutputError, match="outside the allowlist"):
+        validate_explanation_scope(
+            request,
+            explanation.model_copy(update={"candidates": (unknown, second)}),
+        )
+
+    global_only = first.model_copy(
+        update={
+            "summary": first.summary.model_copy(update={"fact_ids": ("report.recommendation",)})
+        }
+    )
+    with pytest.raises(InvalidExplanationOutputError, match="at least one fact"):
+        validate_explanation_scope(
+            request,
+            explanation.model_copy(update={"candidates": (global_only, second)}),
+        )
+
+    other_fact_id = f"candidate.{second.product_id}.name"
+    mixed = first.model_copy(
+        update={
+            "summary": first.summary.model_copy(
+                update={
+                    "fact_ids": (
+                        f"candidate.{first.product_id}.name",
+                        other_fact_id,
+                    )
+                }
+            )
+        }
+    )
+    with pytest.raises(InvalidExplanationOutputError, match="another Product"):
+        validate_explanation_scope(
+            request,
+            explanation.model_copy(update={"candidates": (mixed, second)}),
+        )
+
+
+def test_validate_explanation_scope_requires_disclaimer_caution() -> None:
+    request = explanation_request(maximum_candidates=1)
+    explanation = build_explanation(request)
+    invalid_caution = ExplanationStatement(
+        text="只写预算。",
+        fact_ids=("report.budget.maximum",),
+    )
+
+    with pytest.raises(InvalidExplanationOutputError, match="preserve the deterministic"):
+        validate_explanation_scope(
+            request,
+            explanation.model_copy(update={"cautions": (invalid_caution,)}),
+        )
+
+
+@dataclass
+class FakeExplanationProvider:
+    output: ShoppingReportExplanation | None = None
+    failure: ExplanationFallbackReason | None = None
+    provider_name: str = "fake"
+    model_name: str = "fake-model"
+
+    def explain(self, request: ReportExplanationRequest) -> ShoppingReportExplanation:
+        if self.failure is not None:
+            raise ReportExplanationProviderError(self.failure)
+        return self.output or build_explanation(request)
+
+
+def test_explanation_service_returns_valid_overlay_or_deterministic_fallback() -> None:
+    fixture = build_fixture()
+    rendered = MarkdownShoppingReportRenderer().render(build_report(fixture))
+
+    success = ShoppingReportExplanationService(FakeExplanationProvider()).explain(rendered)
+    assert success.status is ExplanationStatus.EXPLAINED
+    assert success.explanation is not None
+    assert success.provider_name == "fake"
+
+    unconfigured = ShoppingReportExplanationService(None).explain(rendered)
+    assert unconfigured.status is ExplanationStatus.DETERMINISTIC_FALLBACK
+    assert unconfigured.rendered == rendered
+    assert unconfigured.fallback_reason is ExplanationFallbackReason.NOT_CONFIGURED
+
+    unavailable = ShoppingReportExplanationService(
+        FakeExplanationProvider(failure=ExplanationFallbackReason.PROVIDER_UNAVAILABLE)
+    ).explain(rendered)
+    assert unavailable.fallback_reason is ExplanationFallbackReason.PROVIDER_UNAVAILABLE
+
+
+def test_explanation_service_falls_back_on_locally_invalid_output() -> None:
+    fixture = build_fixture()
+    rendered = MarkdownShoppingReportRenderer().render(build_report(fixture))
+    request = ReportExplanationRequestBuilder().build(rendered)
+    output = build_explanation(request).model_copy(update={"report_id": uuid4()})
+
+    result = ShoppingReportExplanationService(FakeExplanationProvider(output=output)).explain(
+        rendered
+    )
+
+    assert result.status is ExplanationStatus.DETERMINISTIC_FALLBACK
+    assert result.fallback_reason is ExplanationFallbackReason.INVALID_OUTPUT
+
+
+def test_explanation_result_and_provider_error_reject_inconsistent_states() -> None:
+    fixture = build_fixture()
+    rendered = MarkdownShoppingReportRenderer().render(build_report(fixture))
+    with pytest.raises(ValidationError, match="fields must match"):
+        ShoppingReportExplanationResult(
+            rendered=rendered,
+            status=ExplanationStatus.EXPLAINED,
+            fallback_reason=ExplanationFallbackReason.INVALID_OUTPUT,
+        )
+    with pytest.raises(ValidationError, match="fields must match"):
+        ShoppingReportExplanationResult(
+            rendered=rendered,
+            status=ExplanationStatus.DETERMINISTIC_FALLBACK,
+            explanation=build_explanation(ReportExplanationRequestBuilder().build(rendered)),
+            provider_name="fake",
+            model_name="fake-model",
+        )
+    with pytest.raises(ValueError, match="cannot report"):
+        ReportExplanationProviderError(ExplanationFallbackReason.NOT_CONFIGURED)

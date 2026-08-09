@@ -13,6 +13,7 @@ authors = [{ name = "GreenBrown-one" }]
 dependencies = [
   "alembic>=1.16,<2",
   "mcp>=2,<3",
+  "openai>=2.53,<3",
   "playwright>=1.61,<2",
   "pydantic>=2.11,<3",
   "sqlalchemy>=2.0.41,<3",
