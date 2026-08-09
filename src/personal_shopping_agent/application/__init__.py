@@ -1,5 +1,14 @@
 """Application use cases and deterministic orchestration contracts."""
 
+from personal_shopping_agent.application.collection import (
+    CandidateDiscovery,
+    NoCandidatesDiscoveredError,
+    ProductDetailCollector,
+    SearchDetailCollectionResult,
+    SearchDetailCollectionService,
+    SearchDetailUnitOfWork,
+    SearchDetailUnitOfWorkFactory,
+)
 from personal_shopping_agent.application.details import (
     PlatformDetailAdapter,
     PlatformDetailParseError,
@@ -38,10 +47,12 @@ from personal_shopping_agent.application.workflow import (
 )
 
 __all__ = [
+    "CandidateDiscovery",
     "CandidateDiscoveryService",
     "CollectedPage",
     "DetailObservation",
     "InvalidWorkflowTransitionError",
+    "NoCandidatesDiscoveredError",
     "PageCollector",
     "PlatformAccessRestrictedError",
     "PlatformCandidate",
@@ -55,7 +66,12 @@ __all__ = [
     "PlatformSearchResult",
     "PlatformSpecificationObservation",
     "PlatformVariantOption",
+    "ProductDetailCollector",
     "ProductDetailService",
+    "SearchDetailCollectionResult",
+    "SearchDetailCollectionService",
+    "SearchDetailUnitOfWork",
+    "SearchDetailUnitOfWorkFactory",
     "SearchObservation",
     "ShoppingWorkflow",
     "ShoppingWorkflowService",

@@ -76,6 +76,58 @@ def request_record(request: ShoppingRequest) -> ShoppingRequestRecord:
     )
 
 
+def load_workflow_snapshot(session: Session, workflow_id: UUID) -> WorkflowSnapshot:
+    """Load and revalidate a complete workflow snapshot in an existing transaction."""
+
+    workflow = session.get(WorkflowRecord, str(workflow_id))
+    if workflow is None:
+        raise EntityNotFoundError("shopping_workflows entity was not found")
+    request = session.get(ShoppingRequestRecord, workflow.request_id)
+    if request is None:
+        raise EntityNotFoundError("workflow request entity was not found")
+    statement = (
+        select(WorkflowEventRecord)
+        .where(WorkflowEventRecord.workflow_id == str(workflow_id))
+        .order_by(WorkflowEventRecord.sequence)
+    )
+    events = session.scalars(statement).all()
+    return WorkflowSnapshot(
+        request=ShoppingRequest.model_validate(request.payload),
+        workflow=ShoppingWorkflow.model_validate(workflow.payload),
+        events=tuple(WorkflowEvent.model_validate(event.payload) for event in events),
+    )
+
+
+def apply_workflow_transition(
+    session: Session,
+    workflow: ShoppingWorkflow,
+    event: WorkflowEvent,
+    *,
+    expected_revision: int,
+) -> None:
+    """Apply one optimistic workflow transition inside an existing transaction."""
+
+    statement = (
+        update(WorkflowRecord)
+        .where(
+            WorkflowRecord.id == str(workflow.id),
+            WorkflowRecord.revision == expected_revision,
+        )
+        .values(
+            state=workflow.state.value,
+            revision=workflow.revision,
+            updated_at=workflow.updated_at,
+            error_code=workflow.error_code,
+            error_message=workflow.error_message,
+            payload=domain_payload(workflow),
+        )
+    )
+    result = cast(CursorResult[Any], session.execute(statement))
+    if result.rowcount != 1:
+        raise ConcurrentWorkflowUpdateError("workflow revision is stale")
+    session.add(event_record(event))
+
+
 class SQLiteWorkflowRepository:
     """Durable workflow store with atomic start and optimistic transitions."""
 
@@ -106,23 +158,7 @@ class SQLiteWorkflowRepository:
         """Load and revalidate the request, workflow, and ordered audit trail."""
 
         with self._session_factory() as session:
-            workflow = session.get(WorkflowRecord, str(workflow_id))
-            if workflow is None:
-                raise EntityNotFoundError("shopping_workflows entity was not found")
-            request = session.get(ShoppingRequestRecord, workflow.request_id)
-            if request is None:
-                raise EntityNotFoundError("workflow request entity was not found")
-            statement = (
-                select(WorkflowEventRecord)
-                .where(WorkflowEventRecord.workflow_id == str(workflow_id))
-                .order_by(WorkflowEventRecord.sequence)
-            )
-            events = session.scalars(statement).all()
-            return WorkflowSnapshot(
-                request=ShoppingRequest.model_validate(request.payload),
-                workflow=ShoppingWorkflow.model_validate(workflow.payload),
-                events=tuple(WorkflowEvent.model_validate(event.payload) for event in events),
-            )
+            return load_workflow_snapshot(session, workflow_id)
 
     def save_transition(
         self,
@@ -133,23 +169,10 @@ class SQLiteWorkflowRepository:
     ) -> None:
         """Atomically update current state and append an event if the revision is current."""
 
-        statement = (
-            update(WorkflowRecord)
-            .where(
-                WorkflowRecord.id == str(workflow.id),
-                WorkflowRecord.revision == expected_revision,
-            )
-            .values(
-                state=workflow.state.value,
-                revision=workflow.revision,
-                updated_at=workflow.updated_at,
-                error_code=workflow.error_code,
-                error_message=workflow.error_message,
-                payload=domain_payload(workflow),
-            )
-        )
         with session_scope(self._session_factory) as session:
-            result = cast(CursorResult[Any], session.execute(statement))
-            if result.rowcount != 1:
-                raise ConcurrentWorkflowUpdateError("workflow revision is stale")
-            session.add(event_record(event))
+            apply_workflow_transition(
+                session,
+                workflow,
+                event,
+                expected_revision=expected_revision,
+            )
