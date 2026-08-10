@@ -50,6 +50,7 @@ class ReportFormat(StrEnum):
     """Supported deterministic report serialization formats."""
 
     MARKDOWN = "markdown"
+    HTML = "html"
 
 
 class ReportCandidate(ReportModel):
@@ -162,6 +163,12 @@ class RenderedShoppingReport(ReportModel):
         if self.content_sha256 != expected:
             raise ValueError("rendered report hash must match its UTF-8 content")
         return self
+
+
+class ShoppingReportRenderer(Protocol):
+    """Provider-neutral deterministic serialization boundary for one report snapshot."""
+
+    def render(self, report: ShoppingDecisionReport) -> RenderedShoppingReport: ...
 
 
 class ShoppingReportResult(ReportModel):
@@ -299,20 +306,20 @@ def _money(value: Money) -> str:
     return f"{escape_markdown(value.currency)} {escape_markdown(format(value.amount, 'f'))}"
 
 
-_BUDGET_LABELS = {
+REPORT_BUDGET_LABELS = {
     "within_budget": "正常预算内",
     "within_stretch": "弹性预算内",
     "over_budget": "超出预算",
     "not_assessed": "未评估",
 }
-_STATUS_LABELS = {
+REPORT_STATUS_LABELS = {
     "satisfied": "满足",
     "unsatisfied": "未满足",
     "missing": "缺失",
     "conflict": "冲突",
     "unresolved": "未解决",
 }
-_EXCLUSION_LABELS = {
+REPORT_EXCLUSION_LABELS = {
     "criteria_not_defined": "请求没有可评分条件",
     "hard_requirements_unmet": "硬性条件未满足",
     "no_comparable_offer": "没有可比报价",
@@ -387,7 +394,7 @@ class MarkdownShoppingReportRenderer:
             lines.extend(
                 f"- **{escape_markdown(item.product.canonical_name)}**："
                 + "；".join(
-                    escape_markdown(_EXCLUSION_LABELS.get(code, code))
+                    escape_markdown(REPORT_EXCLUSION_LABELS.get(code, code))
                     for code in item.score.exclusion_codes
                 )
                 for item in excluded
@@ -434,7 +441,8 @@ class MarkdownShoppingReportRenderer:
         assert score.pareto_front is not None
         return (
             f"| {score.rank} | {escape_markdown(candidate.product.canonical_name)} | "
-            f"{_BUDGET_LABELS[score.budget_status.value]} | {_money(score.selected_price)} | "
+            f"{REPORT_BUDGET_LABELS[score.budget_status.value]} | "
+            f"{_money(score.selected_price)} | "
             f"{_money(score.effective_cost)} | {_decimal(score.final_score, 6)} | "
             f"{_decimal(score.value_per_100, 6)} | "
             f"{_decimal(score.confidence.evidence_confidence, 6)} | "
@@ -479,7 +487,7 @@ class MarkdownShoppingReportRenderer:
         ):
             lines.append(
                 f"| {escape_markdown(evaluation.key)} | "
-                f"{_STATUS_LABELS[evaluation.status.value]} | "
+                f"{REPORT_STATUS_LABELS[evaluation.status.value]} | "
                 f"{_decimal(evaluation.score, 6)} | {_decimal(confidence.confidence, 6)} | "
                 f"{'是' if evaluation.hard_requirement else '否'} |"
             )
@@ -545,7 +553,7 @@ class ShoppingReportService:
         unit_of_work_factory: ShoppingReportUnitOfWorkFactory,
         *,
         builder: ShoppingReportBuilder | None = None,
-        renderer: MarkdownShoppingReportRenderer | None = None,
+        renderer: ShoppingReportRenderer | None = None,
         state_machine: WorkflowStateMachine | None = None,
         clock: Callable[[], datetime] = workflow_now,
     ) -> None:

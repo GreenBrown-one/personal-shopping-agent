@@ -7,7 +7,10 @@ from personal_shopping_agent.application.explanation import (
     RenderedShoppingReportPresentation,
     ShoppingReportPresentationService,
 )
-from personal_shopping_agent.application.reporting import RenderedShoppingReport
+from personal_shopping_agent.application.reporting import (
+    RenderedShoppingReport,
+    ShoppingReportRenderer,
+)
 
 
 class ShoppingReportNotFoundError(LookupError):
@@ -31,9 +34,11 @@ class ShoppingReportAccessService:
         self,
         reader: ShoppingReportReader,
         presentation_service: ShoppingReportPresentationService,
+        html_renderer: ShoppingReportRenderer,
     ) -> None:
         self._reader = reader
         self._presentation_service = presentation_service
+        self._html_renderer = html_renderer
 
     def get(self, workflow_id: UUID) -> RenderedShoppingReport:
         """Return the stored deterministic report without invoking any model."""
@@ -44,3 +49,8 @@ class ShoppingReportAccessService:
         """Read one report and explicitly request its optional explanation overlay."""
 
         return self._presentation_service.present(self._reader.get(workflow_id))
+
+    def get_html(self, workflow_id: UUID) -> RenderedShoppingReport:
+        """Derive deterministic HTML from the same validated report snapshot."""
+
+        return self._html_renderer.render(self._reader.get(workflow_id).report)

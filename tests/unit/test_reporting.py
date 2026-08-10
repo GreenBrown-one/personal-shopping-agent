@@ -71,6 +71,7 @@ from personal_shopping_agent.domain import (
     ShoppingRequest,
     StoreType,
 )
+from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
 
 NOW = datetime(2026, 8, 10, 2, 0, tzinfo=UTC)
 GENERATED_AT = NOW + timedelta(seconds=1)
@@ -264,6 +265,61 @@ def test_builder_and_renderer_create_auditable_escaped_markdown() -> None:
     assert "https://manufacturer.example.com/x1" in rendered.content
     assert "选定价格超出预算上限" in rendered.content
     assert "系统不会自动下单或支付" in rendered.content
+
+
+def test_html_renderer_is_deterministic_complete_and_autoescaped() -> None:
+    request = build_request().model_copy(
+        update={"query": '<script>alert("unsafe")</script> & compare'}
+    )
+    report = build_report(build_fixture(request=request))
+    renderer = HtmlShoppingReportRenderer()
+
+    first = renderer.render(report)
+    second = renderer.render(report)
+
+    assert first == second
+    assert first.format is ReportFormat.HTML
+    assert first.content.startswith("<!doctype html>")
+    assert "Content-Security-Policy" in first.content
+    assert "default-src &#39;none&#39;" not in first.content
+    assert "<script>alert" not in first.content
+    assert "&lt;script&gt;alert(&#34;unsafe&#34;)&lt;/script&gt; &amp; compare" in first.content
+    assert "Example [X1] | phone" in first.content
+    assert "选定价格超出预算上限" in first.content
+    assert 'href="https://manufacturer.example.com/x1"' in first.content
+    assert first.content_sha256 == hashlib.sha256(first.content.encode("utf-8")).hexdigest()
+
+
+def test_html_renderer_handles_empty_ranking_optional_budget_and_evidence() -> None:
+    excluded = HtmlShoppingReportRenderer().render(build_report(build_fixture(amounts=("151",))))
+    assert "当前没有通过全部资格闸门" in excluded.content
+    assert "选定价格超出预算上限" in excluded.content
+
+    request = build_request(include_stretch=False)
+    fixture = build_fixture(amounts=("80",), request=request)
+    valid = build_report(fixture).candidates[0]
+    criterion = valid.score.confidence.criteria[0].model_copy(update={"evidence_ids": ()})
+    confidence = valid.score.confidence.model_copy(update={"criteria": (criterion,)})
+    score = CandidateScore.model_validate(valid.score.model_dump() | {"confidence": confidence})
+    candidate = ReportCandidate(
+        product=valid.product,
+        score=score,
+        offer=valid.offer,
+        evidence=(),
+    )
+    report = ShoppingDecisionReport(
+        request=request,
+        workflow_id=fixture.batch.workflow_id,
+        candidates=(candidate,),
+        recommended_product_id=candidate.product.id,
+        generated_at=GENERATED_AT,
+    )
+
+    content = HtmlShoppingReportRenderer().render(report).content
+
+    assert "弹性预算：未设置" in content
+    assert "无可链接证据" in content
+    assert "<h2>未进入排名</h2>" in content and "<p>无。</p>" in content
 
 
 def test_report_without_eligible_candidate_is_explicit() -> None:

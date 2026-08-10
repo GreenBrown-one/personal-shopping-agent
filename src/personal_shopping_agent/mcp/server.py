@@ -22,6 +22,7 @@ from personal_shopping_agent.llm import (
     load_llm_explanation_settings,
 )
 from personal_shopping_agent.mcp.schemas import AgentCapabilities, StartShoppingWorkflowInput
+from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
 from personal_shopping_agent.storage import (
     SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
@@ -92,6 +93,7 @@ def create_mcp_server(
             cross_platform_comparison=False,
             ranking=False,
             deterministic_reports=True,
+            html_reports=True,
             llm_explanations=explanation_provider is not ExplanationProviderKind.DISABLED,
             llm_explanation_provider=explanation_provider.value,
             automatic_purchase=False,
@@ -146,6 +148,17 @@ def create_mcp_server(
         return report_access_service.get(workflow_id)
 
     @server.tool(
+        name="get_shopping_report_html",
+        title="Get a safe standalone HTML shopping report",
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def _get_shopping_report_html(workflow_id: UUID) -> RenderedShoppingReport:
+        """Derive script-free HTML from the validated deterministic report snapshot."""
+
+        return report_access_service.get_html(workflow_id)
+
+    @server.tool(
         name="explain_shopping_report",
         title="Explicitly request an optional AI report explanation",
         annotations=EXTERNAL_READ,
@@ -162,6 +175,7 @@ def create_mcp_server(
         _get_shopping_workflow,
         _render_shopping_report,
         _get_shopping_report,
+        _get_shopping_report_html,
         _explain_shopping_report,
     )
     return server
@@ -183,6 +197,7 @@ def create_server_for_database(
         ShoppingReportAccessService(
             SQLiteShoppingReportRepository(session_factory),
             create_report_presentation_service(settings),
+            HtmlShoppingReportRenderer(),
         ),
         explanation_provider=settings.provider,
     )

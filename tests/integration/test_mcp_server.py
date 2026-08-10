@@ -23,6 +23,7 @@ from personal_shopping_agent.application import (
     OfferCostAssessment,
     RenderedShoppingReport,
     RenderedShoppingReportPresentation,
+    ReportFormat,
     ShoppingReportAccessService,
     ShoppingReportResult,
     ShoppingReportService,
@@ -50,6 +51,7 @@ from personal_shopping_agent.llm import (
     create_report_presentation_service,
 )
 from personal_shopping_agent.mcp.server import create_mcp_server, create_server_for_database
+from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
 from personal_shopping_agent.storage import (
     SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
@@ -83,6 +85,7 @@ def create_test_server(
         ShoppingReportAccessService(
             SQLiteShoppingReportRepository(session_factory),
             create_report_presentation_service(LLMExplanationSettings()),
+            HtmlShoppingReportRenderer(),
         ),
         explanation_provider=explanation_provider,
     )
@@ -238,6 +241,7 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
                 "get_shopping_workflow",
                 "render_shopping_report",
                 "get_shopping_report",
+                "get_shopping_report_html",
                 "explain_shopping_report",
             ]
             assert listed.tools[0].annotations is not None
@@ -253,14 +257,19 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
             assert listed.tools[4].annotations.open_world_hint is False
             assert listed.tools[5].annotations is not None
             assert listed.tools[5].annotations.read_only_hint is True
-            assert listed.tools[5].annotations.idempotent_hint is False
-            assert listed.tools[5].annotations.open_world_hint is True
+            assert listed.tools[5].annotations.idempotent_hint is True
+            assert listed.tools[5].annotations.open_world_hint is False
+            assert listed.tools[6].annotations is not None
+            assert listed.tools[6].annotations.read_only_hint is True
+            assert listed.tools[6].annotations.idempotent_hint is False
+            assert listed.tools[6].annotations.open_world_hint is True
 
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
             assert status.structured_content["milestone"] == "M5"
             assert status.structured_content["cross_platform_comparison"] is False
             assert status.structured_content["deterministic_reports"] is True
+            assert status.structured_content["html_reports"] is True
             assert status.structured_content["llm_explanations"] is False
             assert status.structured_content["llm_explanation_provider"] == "disabled"
             assert status.structured_content["automatic_purchase"] is False
@@ -326,6 +335,17 @@ def test_mcp_report_tools_render_read_and_explicitly_fallback_without_llm() -> N
             assert stored_result.structured_content is not None
             stored = RenderedShoppingReport.model_validate(stored_result.structured_content)
             assert stored == committed.rendered
+
+            html_result = await client.call_tool(
+                "get_shopping_report_html",
+                {"workflow_id": str(workflow_id)},
+            )
+            assert html_result.structured_content is not None
+            html = RenderedShoppingReport.model_validate(html_result.structured_content)
+            assert html.report == stored.report
+            assert html.format is ReportFormat.HTML
+            assert html.content.startswith("<!doctype html>")
+            assert "Content-Security-Policy" in html.content
 
             explained_result = await client.call_tool(
                 "explain_shopping_report",

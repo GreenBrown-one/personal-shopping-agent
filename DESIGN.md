@@ -383,6 +383,21 @@ MCP 分别暴露三个边界清晰的工具：`render_shopping_report` 只允许
 内部已实现 M3/M4 服务就宣称 MCP 已能自行完成整条购物流程。MCP 仍不得提供任意状态推进、下单或支付
 工具。
 
+M5 第五个切片完成确定性 HTML 报告。持久化的 Markdown 及其完整报告快照继续作为唯一规范报告；HTML
+不新建第二份数据库事实，而是由 `ShoppingReportAccessService` 从同一已验证
+`ShoppingDecisionReport` 按需派生。这避免修改工作流状态、重复报告记录或 Markdown/HTML 快照漂移。
+HTML 使用独立 `ReportFormat.HTML` 与自己的 UTF-8 SHA-256，生成时间仍等于原报告时间。
+
+HTML 适配器使用 Jinja2 3.1 系列的包内模板、`SandboxedEnvironment`、`StrictUndefined` 和默认开启的
+自动转义。模板是开发者控制的静态资源，用户需求、商品名、卖家、来源标题等外部文字只能作为数据
+进入模板。输出是无 JavaScript、无表单、无图片、无字体和无外部 CSS 的单文件文档，并带 CSP、
+`no-referrer` 及安全外链属性。模板必须展示与 Markdown 相同的需求、预算、结论、排名、价格、风险、
+条件分、证据、排除原因和限制；缺失与无合格候选仍需明确显示。
+
+`get_shopping_report_html` 是只读、幂等且不访问开放网络的 MCP 工具；它不调用 LLM，也不把 HTML 写回
+数据库。可选模型解释继续通过独立的 Markdown 解释工具提供，不混入确定性 HTML，以保持 HTML 导出
+完全可复现。模板必须随 Python wheel 打包并在发布验证中检查。
+
 ## 6. 确定性工作流
 
 首版使用显式状态机，不使用通用 Agent 图框架：
