@@ -38,6 +38,8 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run pyright
+uv build
+uv run python scripts/verify_wheel.py dist
 ```
 
 健康检查成功时会输出：
@@ -177,7 +179,13 @@ M6 的第一个切片装配可恢复的京东决策管线。`ShoppingDecisionPip
 M6 的第二个切片补齐安装与数据库启动边界。所有 Alembic 迁移和 HTML 模板都进入 wheel；新的
 `personal-shopping-agent health|doctor|migrate` 管理入口提供稳定 JSON 和退出码，错误不回显数据库 URL
 或内部异常。默认 MCP 进程只接受已经达到随包 head 的数据库。CI 除完整静态检查与测试外，还构建
-sdist/wheel，并从解压后的 wheel（而不是源码目录）迁移一个全新 SQLite 数据库后再次检查版本。
+sdist/wheel，并验证 wheel 中的迁移、模板和命令入口。
+
+M6 的第三个切片收紧发行一致性。项目版本只在无依赖的 `__about__.py` 中声明，Hatch 构建元数据、
+Python 包、健康检查与 MCP 服务器共同读取该值，避免分别维护后漂移。CI 不再仅解压 wheel：它会创建
+与源码环境隔离的全新虚拟环境，安装 wheel 及其依赖，实际执行健康检查、迁移前的拒绝检查、迁移、
+迁移后的就绪检查，并从安装位置组合默认 MCP 服务器。验证脚本接收 `dist` 目录并自动定位唯一 wheel，
+因此发布版本变化时无需改写 CI 文件名。
 
 淘宝/天猫和拼多多只作为未来适配器候选保留，不在 v1.0 同时接入。当前顺序是先把京东搜索、详情、地区价格、库存语境和证据链做完整，再评估第二个平台，避免在多套不稳定页面结构上过早摊薄测试与维护投入。
 

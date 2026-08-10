@@ -43,5 +43,5 @@ jobs:
       - name: Build source and wheel distributions
         run: uv build
 
-      - name: Verify built wheel migrations
-        run: uv run python scripts/verify_wheel.py dist/personal_shopping_agent-0.1.0-py3-none-any.whl
+      - name: Verify wheel in a clean installation
+        run: uv run python scripts/verify_wheel.py dist

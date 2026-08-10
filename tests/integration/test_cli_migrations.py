@@ -8,6 +8,7 @@ from alembic.config import Config
 
 import personal_shopping_agent.cli as cli_module
 import personal_shopping_agent.storage.migrations as migration_module
+from personal_shopping_agent import __version__
 from personal_shopping_agent.cli import main
 from personal_shopping_agent.mcp import create_default_server
 from personal_shopping_agent.runtime_settings import DATABASE_URL_ENV
@@ -35,7 +36,7 @@ def test_cli_health_and_missing_database_doctor_are_non_destructive(
     assert _output(capsys) == {
         "service": "personal-shopping-agent",
         "status": "ok",
-        "version": "0.1.0",
+        "version": __version__,
     }
 
     assert main(["doctor"], environment={DATABASE_URL_ENV: database_url}) == 1
