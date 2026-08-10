@@ -5,9 +5,10 @@ from enum import StrEnum
 from typing import Self
 from uuid import UUID, uuid4
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
 from personal_shopping_agent.domain import ShoppingRequest
+from personal_shopping_agent.serialization import JsonContractModel
 
 
 class WorkflowState(StrEnum):
@@ -43,7 +44,7 @@ def workflow_now() -> datetime:
     return datetime.now(UTC)
 
 
-class WorkflowModel(BaseModel):
+class WorkflowModel(JsonContractModel):
     """Strict immutable base for orchestration state and audit events."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)

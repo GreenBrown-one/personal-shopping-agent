@@ -12,7 +12,7 @@ from types import TracebackType
 from typing import Protocol, Self, TypeVar
 from uuid import UUID, uuid4
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
 from personal_shopping_agent.application.ranking import CandidateRankingBatch, CandidateScore
 from personal_shopping_agent.application.workflow import (
@@ -32,6 +32,7 @@ from personal_shopping_agent.domain import (
     Product,
     ShoppingRequest,
 )
+from personal_shopping_agent.serialization import JsonContractModel
 
 REPORT_METHODOLOGY_VERSION = "m5-report-v1"
 REPORT_DISCLAIMER = (
@@ -40,7 +41,7 @@ REPORT_DISCLAIMER = (
 )
 
 
-class ReportModel(BaseModel):
+class ReportModel(JsonContractModel):
     """Strict immutable base for report inputs and durable outputs."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
