@@ -3,14 +3,21 @@
 from personal_shopping_agent.mcp.schemas import (
     AgentCapabilities,
     CriterionInput,
+    RunShoppingPipelineInput,
     StartShoppingWorkflowInput,
 )
-from personal_shopping_agent.mcp.server import create_mcp_server, create_server_for_database
+from personal_shopping_agent.mcp.server import (
+    create_jd_pipeline_server_for_database,
+    create_mcp_server,
+    create_server_for_database,
+)
 
 __all__ = [
     "AgentCapabilities",
     "CriterionInput",
+    "RunShoppingPipelineInput",
     "StartShoppingWorkflowInput",
+    "create_jd_pipeline_server_for_database",
     "create_mcp_server",
     "create_server_for_database",
 ]

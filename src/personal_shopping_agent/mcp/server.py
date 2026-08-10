@@ -6,10 +6,15 @@ from uuid import UUID
 
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
+from sqlalchemy.orm import Session, sessionmaker
 
 from personal_shopping_agent.application import (
+    OfficialEvidenceProvider,
+    PageCollector,
     RenderedShoppingReport,
     RenderedShoppingReportPresentation,
+    ShoppingDecisionPipelineService,
+    ShoppingPipelineResult,
     ShoppingReportAccessService,
     ShoppingReportResult,
     ShoppingReportService,
@@ -18,11 +23,17 @@ from personal_shopping_agent.application import (
 )
 from personal_shopping_agent.llm import (
     ExplanationProviderKind,
+    LLMExplanationSettings,
     create_report_presentation_service,
     load_llm_explanation_settings,
 )
-from personal_shopping_agent.mcp.schemas import AgentCapabilities, StartShoppingWorkflowInput
+from personal_shopping_agent.mcp.schemas import (
+    AgentCapabilities,
+    RunShoppingPipelineInput,
+    StartShoppingWorkflowInput,
+)
 from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
+from personal_shopping_agent.runtime import create_jd_pipeline_service
 from personal_shopping_agent.storage import (
     SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
@@ -52,6 +63,12 @@ EXTERNAL_READ = ToolAnnotations(
     idempotent_hint=False,
     open_world_hint=True,
 )
+PIPELINE_WRITE = ToolAnnotations(
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=False,
+    open_world_hint=True,
+)
 
 
 def create_mcp_server(
@@ -60,6 +77,7 @@ def create_mcp_server(
     report_access_service: ShoppingReportAccessService,
     *,
     explanation_provider: ExplanationProviderKind = ExplanationProviderKind.DISABLED,
+    pipeline_service: ShoppingDecisionPipelineService | None = None,
 ) -> MCPServer:
     """Register a deterministic, dependency-injected MCP server."""
 
@@ -72,7 +90,8 @@ def create_mcp_server(
             "Create and inspect local shopping workflows. Deterministic reports can be rendered "
             "only after scoring has completed. Reading a report never calls an LLM; use the "
             "separate explanation tool to explicitly request an optional model-generated overlay. "
-            "Platform collection, scoring, checkout, and payment tools are not exposed."
+            "An end-to-end JD pipeline tool is present only in an explicitly configured server. "
+            "Checkout and payment are never available."
         ),
     )
 
@@ -86,20 +105,22 @@ def create_mcp_server(
         """Return an honest summary of implemented and unavailable capabilities."""
 
         return AgentCapabilities(
-            milestone="M5",
+            milestone="M6" if pipeline_service is not None else "M5",
             local_workflows=True,
             local_storage=True,
-            platform_collection=False,
+            end_to_end_pipeline=pipeline_service is not None,
+            platform_collection=pipeline_service is not None,
             cross_platform_comparison=False,
-            ranking=False,
+            ranking=pipeline_service is not None,
             deterministic_reports=True,
             html_reports=True,
             llm_explanations=explanation_provider is not ExplanationProviderKind.DISABLED,
             llm_explanation_provider=explanation_provider.value,
             automatic_purchase=False,
             message=(
-                "M5 exposes deterministic reports for already-scored workflows; platform "
-                "collection and scoring MCP tools remain unavailable."
+                "M6 JD pipeline is explicitly configured and resumable."
+                if pipeline_service is not None
+                else "M5 report tools are available; the end-to-end pipeline is not configured."
             ),
         )
 
@@ -169,6 +190,27 @@ def create_mcp_server(
 
         return report_access_service.explain(workflow_id)
 
+    if pipeline_service is not None:
+        configured_pipeline = pipeline_service
+
+        @server.tool(
+            name="run_shopping_pipeline",
+            title="Run or resume the configured shopping decision pipeline",
+            annotations=PIPELINE_WRITE,
+            structured_output=True,
+        )
+        async def _run_shopping_pipeline(
+            request: RunShoppingPipelineInput,
+        ) -> ShoppingPipelineResult:
+            """Execute only real remaining stages and stop at the last committed stage on error."""
+
+            return await configured_pipeline.run(
+                request.workflow_id,
+                options=request.to_options(),
+            )
+
+        _ = _run_shopping_pipeline
+
     _ = (
         _shopping_agent_status,
         _start_shopping_workflow,
@@ -181,6 +223,25 @@ def create_mcp_server(
     return server
 
 
+def _create_server_for_session_factory(
+    session_factory: sessionmaker[Session],
+    settings: LLMExplanationSettings,
+    *,
+    pipeline_service: ShoppingDecisionPipelineService | None = None,
+) -> MCPServer:
+    return create_mcp_server(
+        ShoppingWorkflowService(SQLiteWorkflowRepository(session_factory)),
+        ShoppingReportService(lambda: SQLiteShoppingReportUnitOfWork(session_factory)),
+        ShoppingReportAccessService(
+            SQLiteShoppingReportRepository(session_factory),
+            create_report_presentation_service(settings),
+            HtmlShoppingReportRenderer(),
+        ),
+        explanation_provider=settings.provider,
+        pipeline_service=pipeline_service,
+    )
+
+
 def create_server_for_database(
     database_url: str,
     *,
@@ -191,15 +252,30 @@ def create_server_for_database(
     engine = create_sqlite_engine(database_url)
     session_factory = create_session_factory(engine)
     settings = load_llm_explanation_settings(environment)
-    return create_mcp_server(
-        ShoppingWorkflowService(SQLiteWorkflowRepository(session_factory)),
-        ShoppingReportService(lambda: SQLiteShoppingReportUnitOfWork(session_factory)),
-        ShoppingReportAccessService(
-            SQLiteShoppingReportRepository(session_factory),
-            create_report_presentation_service(settings),
-            HtmlShoppingReportRenderer(),
-        ),
-        explanation_provider=settings.provider,
+    return _create_server_for_session_factory(session_factory, settings)
+
+
+def create_jd_pipeline_server_for_database(
+    database_url: str,
+    page_collector: PageCollector,
+    official_evidence_provider: OfficialEvidenceProvider,
+    *,
+    environment: Mapping[str, str] | None = None,
+) -> MCPServer:
+    """Compose an explicitly enabled JD pipeline around caller-owned safe external ports."""
+
+    engine = create_sqlite_engine(database_url)
+    session_factory = create_session_factory(engine)
+    settings = load_llm_explanation_settings(environment)
+    pipeline_service = create_jd_pipeline_service(
+        session_factory,
+        page_collector,
+        official_evidence_provider,
+    )
+    return _create_server_for_session_factory(
+        session_factory,
+        settings,
+        pipeline_service=pipeline_service,
     )
 
 
