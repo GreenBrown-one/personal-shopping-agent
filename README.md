@@ -31,7 +31,8 @@
 uv sync --locked --dev
 uv run playwright install chromium
 uv run python -m personal_shopping_agent
-uv run alembic upgrade head
+uv run personal-shopping-agent migrate
+uv run personal-shopping-agent doctor
 uv run personal-shopping-agent-mcp
 uv run pytest
 uv run ruff check .
@@ -44,6 +45,12 @@ uv run pyright
 ```json
 {"service": "personal-shopping-agent", "status": "ok", "version": "0.1.0"}
 ```
+
+首次启动 MCP 前必须运行 `personal-shopping-agent migrate`。该命令使用 wheel 内随附的 Alembic 历史，
+只执行向前迁移；`personal-shopping-agent doctor` 只检查数据库文件和版本，不会创建缺失数据库。两者
+默认读取 `PERSONAL_SHOPPING_DATABASE_URL`，未设置时使用
+`sqlite:///data/personal-shopping-agent.db`，也可显式传入 `--database-url`。MCP 入口发现数据库缺失或
+版本落后时会拒绝启动并提示先迁移，不会在工具调用期间临时改表。
 
 ## 可选 LLM 解释器
 
@@ -166,6 +173,11 @@ M6 的第一个切片装配可恢复的京东决策管线。`ShoppingDecisionPip
 服务器才增加 `run_shopping_pipeline` 并报告 M6 能力。离线时可显式使用
 `NoOfficialEvidenceProvider`，系统会把官方来源记为缺失而不是猜测。结构化 MCP 输出还统一把 Decimal
 编码为无指数的精确字符串，以保持返回值与公开 JSON Schema 一致。
+
+M6 的第二个切片补齐安装与数据库启动边界。所有 Alembic 迁移和 HTML 模板都进入 wheel；新的
+`personal-shopping-agent health|doctor|migrate` 管理入口提供稳定 JSON 和退出码，错误不回显数据库 URL
+或内部异常。默认 MCP 进程只接受已经达到随包 head 的数据库。CI 除完整静态检查与测试外，还构建
+sdist/wheel，并从解压后的 wheel（而不是源码目录）迁移一个全新 SQLite 数据库后再次检查版本。
 
 淘宝/天猫和拼多多只作为未来适配器候选保留，不在 v1.0 同时接入。当前顺序是先把京东搜索、详情、地区价格、库存语境和证据链做完整，再评估第二个平台，避免在多套不稳定页面结构上过早摊薄测试与维护投入。
 
