@@ -75,5 +75,8 @@ class AgentCapabilities(MCPModel):
     platform_collection: bool
     cross_platform_comparison: bool
     ranking: bool
+    deterministic_reports: bool
+    llm_explanations: bool
+    llm_explanation_provider: str
     automatic_purchase: bool
     message: str
