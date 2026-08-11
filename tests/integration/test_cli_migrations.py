@@ -1,6 +1,8 @@
 """Integration proof for packaged migration administration and startup readiness."""
 
 import json
+import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,7 @@ import personal_shopping_agent.cli as cli_module
 import personal_shopping_agent.storage.migrations as migration_module
 from personal_shopping_agent import __version__
 from personal_shopping_agent.cli import main
+from personal_shopping_agent.local_security import LocalFileSecurityError
 from personal_shopping_agent.mcp import create_default_server
 from personal_shopping_agent.runtime_settings import DATABASE_URL_ENV
 from personal_shopping_agent.storage import (
@@ -45,6 +48,7 @@ def test_cli_health_and_missing_database_doctor_are_non_destructive(
     assert payload["database"] == {
         "database_exists": False,
         "current_revision": None,
+        "private_file_permissions": None,
         "target_revision": "20260809_0007",
         "ready": False,
     }
@@ -69,12 +73,16 @@ def test_cli_migrate_creates_parent_and_default_server_accepts_current_schema(
         "database": {
             "database_exists": True,
             "current_revision": "20260809_0007",
+            "private_file_permissions": True if os.name == "posix" else None,
             "target_revision": "20260809_0007",
             "ready": True,
         },
         "ok": True,
     }
     assert database_path.is_file()
+    if os.name == "posix":
+        assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
+        assert stat.S_IMODE(database_path.parent.stat().st_mode) == 0o700
 
     assert main(["doctor", "--database-url", database_url], environment={}) == 0
     assert _output(capsys)["ok"] is True
@@ -120,7 +128,39 @@ def test_in_memory_database_status_is_supported_without_claiming_readiness() -> 
 
     assert status.database_exists is True
     assert status.current_revision is None
+    assert status.private_file_permissions is None
     assert status.ready is False
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits are unavailable")
+def test_doctor_fails_closed_and_migrate_repairs_broad_database_permissions(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    database_path = tmp_path / "permissions.db"
+    database_url = f"sqlite:///{database_path}"
+    assert main(["migrate", "--database-url", database_url], environment={}) == 0
+    _output(capsys)
+    database_path.chmod(0o644)
+
+    assert main(["doctor", "--database-url", database_url], environment={}) == 1
+    unsafe = _output(capsys)
+    assert unsafe["database"] == {
+        "database_exists": True,
+        "current_revision": None,
+        "private_file_permissions": False,
+        "target_revision": "20260809_0007",
+        "ready": False,
+    }
+    with pytest.raises(DatabaseSchemaNotReadyError):
+        require_current_database(database_url)
+
+    assert main(["migrate", "--database-url", database_url], environment={}) == 0
+    repaired = _output(capsys)
+    repaired_database = repaired["database"]
+    assert isinstance(repaired_database, dict)
+    assert repaired_database["private_file_permissions"] is True
+    assert stat.S_IMODE(database_path.stat().st_mode) == 0o600
 
 
 def test_migration_inspection_sanitizes_missing_history_and_internal_errors(
@@ -179,3 +219,16 @@ def test_migration_upgrade_sanitizes_command_failure_and_unreached_head(
     monkeypatch.setattr(migration_module, "inspect_database_migrations", inspect_not_ready)
     with pytest.raises(DatabaseMigrationError, match="did not reach"):
         migration_module.upgrade_database("sqlite://")
+
+
+def test_migration_upgrade_sanitizes_private_file_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_security(_: Path) -> None:
+        raise LocalFileSecurityError("sensitive permission detail")
+
+    monkeypatch.setattr(migration_module, "prepare_private_file", fail_security)
+    with pytest.raises(DatabaseMigrationError, match="private file") as captured:
+        migration_module.upgrade_database(f"sqlite:///{tmp_path / 'private.db'}")
+    assert "sensitive permission detail" not in str(captured.value)

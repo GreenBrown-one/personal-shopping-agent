@@ -23,6 +23,11 @@ from playwright.async_api import Error as PlaywrightError
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl
 
 from personal_shopping_agent.browser.policy import NavigationPolicy, NavigationPolicyError
+from personal_shopping_agent.local_security import (
+    LocalFileSecurityError,
+    require_private_directory,
+    secure_existing_private_file,
+)
 
 
 class BrowserManagerError(RuntimeError):
@@ -118,7 +123,12 @@ class BrowserManager:
         if self._context is not None:
             raise BrowserManagerError("The browser manager is already started.")
 
-        self._settings.profile_directory.mkdir(parents=True, exist_ok=True)
+        try:
+            require_private_directory(self._settings.profile_directory)
+        except LocalFileSecurityError as error:
+            raise BrowserManagerError(
+                "The dedicated browser profile directory is not private."
+            ) from error
         manager = self._playwright_factory()
         playwright = await manager.start()
         try:
@@ -184,9 +194,26 @@ class BrowserManager:
             status_code = response.status if response is not None else 0
             screenshot_path: str | None = None
             if screenshot and 200 <= status_code < 400:
-                self._settings.screenshot_directory.mkdir(parents=True, exist_ok=True)
+                try:
+                    require_private_directory(self._settings.screenshot_directory)
+                except LocalFileSecurityError as error:
+                    raise BrowserManagerError(
+                        "The dedicated screenshot directory is not private."
+                    ) from error
                 path = self._settings.screenshot_directory / f"page-{uuid4().hex}.png"
-                await page.screenshot(path=str(path), full_page=True)
+                try:
+                    await page.screenshot(path=str(path), full_page=True)
+                    secure_existing_private_file(path)
+                except PlaywrightError as error:
+                    path.unlink(missing_ok=True)
+                    raise BrowserManagerError(
+                        "The destination page screenshot could not be captured."
+                    ) from error
+                except LocalFileSecurityError as error:
+                    path.unlink(missing_ok=True)
+                    raise BrowserManagerError(
+                        "The destination page screenshot could not be stored privately."
+                    ) from error
                 screenshot_path = str(path)
 
             return BrowserSnapshot.model_validate(
