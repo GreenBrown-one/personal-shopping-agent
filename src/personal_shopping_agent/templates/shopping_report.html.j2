@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>购物比较报告</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.55; }
+    body { max-width: 72rem; margin: 0 auto; padding: 1.5rem; }
+    header, section { margin-bottom: 2rem; }
+    .notice { border-left: .25rem solid #777; padding: .75rem 1rem; background: color-mix(in srgb, CanvasText 6%, Canvas); }
+    .summary, .candidate { border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); border-radius: .5rem; padding: 1rem; }
+    .candidate { margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; overflow-wrap: anywhere; }
+    th, td { border: 1px solid color-mix(in srgb, CanvasText 25%, Canvas); padding: .5rem; text-align: left; }
+    th { background: color-mix(in srgb, CanvasText 8%, Canvas); }
+    .number { text-align: right; font-variant-numeric: tabular-nums; }
+    a { color: LinkText; overflow-wrap: anywhere; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>购物比较报告</h1>
+    <ul>
+      <li>工作流：<code>{{ report.workflow_id }}</code></li>
+      <li>生成时间：<code>{{ report.generated_at.isoformat() }}</code></li>
+      <li>评分方法：<code>{{ report.methodology_version }}</code></li>
+    </ul>
+    <p class="notice">{{ report.disclaimer }}</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>需求摘要</h2>
+      <div class="summary">
+        <ul>
+          <li>商品需求：{{ report.request.query }}</li>
+          <li>类别：{{ report.request.category }}</li>
+          <li>正常预算：{{ report.request.budget.maximum|money }}</li>
+          <li>弹性预算：{% if report.request.budget.stretch_maximum %}{{ report.request.budget.stretch_maximum|money }}{% else %}未设置{% endif %}</li>
+          <li>地区：{{ report.request.region or "未指定" }}</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>当前结论</h2>
+      {% if eligible %}
+      <p>当前排序第一候选为 <strong>{{ eligible[0].product.canonical_name }}</strong>。该结论来自下述确定性规则，不代表自动购买指令。</p>
+      {% else %}
+      <p>当前没有通过全部资格闸门的候选，报告不生成购买候选。</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>合格候选排名</h2>
+      {% if eligible %}
+      <table>
+        <thead>
+          <tr><th>名次</th><th>商品</th><th>预算层</th><th>选定价格</th><th>有效成本</th><th>综合分</th><th>每百元价值</th><th>证据置信度</th><th>Pareto</th></tr>
+        </thead>
+        <tbody>
+          {% for candidate in eligible %}
+          <tr>
+            <td class="number">{{ candidate.score.rank }}</td>
+            <td>{{ candidate.product.canonical_name }}</td>
+            <td>{{ budget_labels[candidate.score.budget_status.value] }}</td>
+            <td class="number">{{ candidate.score.selected_price|money }}</td>
+            <td class="number">{{ candidate.score.effective_cost|money }}</td>
+            <td class="number">{{ candidate.score.final_score|decimal }}</td>
+            <td class="number">{{ candidate.score.value_per_100|decimal }}</td>
+            <td class="number">{{ candidate.score.confidence.evidence_confidence|decimal }}</td>
+            <td class="number">{{ candidate.score.pareto_front }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>无。</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>候选详情</h2>
+      {% for candidate in eligible %}
+      <article class="candidate">
+        <h3>{{ candidate.score.rank }}. {{ candidate.product.canonical_name }}</h3>
+        <ul>
+          <li>品牌 / 型号：{{ candidate.product.brand }} / {{ candidate.product.model }}</li>
+          <li>风险惩罚：{{ candidate.score.risk_penalty|decimal }}</li>
+          <li>调整后效用：{{ (candidate.score.confidence.adjusted_utility or zero)|decimal }}</li>
+          {% if candidate.offer %}
+          <li>报价：{{ candidate.offer.platform }} / {{ candidate.offer.seller }}</li>
+          <li>报价采集时间：<code>{{ candidate.offer.captured_at.isoformat() }}</code></li>
+          <li>商品页面：<a href="{{ candidate.offer.url }}" rel="noopener noreferrer" target="_blank">{{ candidate.offer.url }}</a></li>
+          {% endif %}
+        </ul>
+        <table>
+          <thead><tr><th>条件</th><th>状态</th><th>能力分</th><th>证据分</th><th>硬性</th></tr></thead>
+          <tbody>
+            {% for evaluation in candidate.score.foundation.criterion_evaluations %}
+            {% set confidence = candidate.score.confidence.criteria[loop.index0] %}
+            <tr>
+              <td>{{ evaluation.key }}</td>
+              <td>{{ status_labels[evaluation.status.value] }}</td>
+              <td class="number">{{ evaluation.score|decimal }}</td>
+              <td class="number">{{ confidence.confidence|decimal }}</td>
+              <td>{{ "是" if evaluation.hard_requirement else "否" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <h4>证据来源</h4>
+        {% if candidate.evidence %}
+        <ul>
+          {% for item in candidate.evidence %}
+          <li>{{ item.source_title }}（{{ item.source_type.value }}，<code>{{ item.captured_at.isoformat() }}</code>）：<a href="{{ item.source_url }}" rel="noopener noreferrer" target="_blank">{{ item.source_url }}</a></li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p>无可链接证据。</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+
+    <section>
+      <h2>未进入排名</h2>
+      {% if excluded %}
+      <ul>
+        {% for candidate in excluded %}
+        <li><strong>{{ candidate.product.canonical_name }}</strong>：{% for code in candidate.score.exclusion_codes %}{{ exclusion_labels.get(code, code) }}{% if not loop.last %}；{% endif %}{% endfor %}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>无。</p>
+      {% endif %}
+    </section>
+
+    <section>
+      <h2>方法与限制</h2>
+      <ul>
+        <li>正常预算候选始终排在弹性预算候选之前；预算层按选定价格判断。</li>
+        <li>Pareto 前沿同时比较调整后效用、证据置信度和有效成本。</li>
+        <li>综合分用于稳定排序，不替代参数、来源、价格和风险的分项检查。</li>
+        <li>页面价格、库存、优惠、配送和售后可能在采集后变化，请在购买前复核。</li>
+        <li>本系统不执行下单、支付或其他不可逆消费操作。</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
