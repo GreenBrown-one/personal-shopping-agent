@@ -9,6 +9,13 @@ from personal_shopping_agent.application.collection import (
     SearchDetailUnitOfWork,
     SearchDetailUnitOfWorkFactory,
 )
+from personal_shopping_agent.application.confidence import (
+    CandidateEvidenceConfidence,
+    CriterionEvidenceAssessment,
+    EvidenceConfidenceEvaluator,
+    EvidenceScopeMismatchError,
+    InvalidEvidenceTimelineError,
+)
 from personal_shopping_agent.application.conversion import (
     ConvertedDetailBatch,
     DetailConversionError,
@@ -101,6 +108,7 @@ from personal_shopping_agent.application.workflow import (
 __all__ = [
     "CandidateDiscovery",
     "CandidateDiscoveryService",
+    "CandidateEvidenceConfidence",
     "CandidateScoringFoundation",
     "CandidateScoringFoundationBuilder",
     "CollectedPage",
@@ -108,17 +116,21 @@ __all__ = [
     "CriterionEvaluation",
     "CriterionEvaluationStatus",
     "CriterionEvaluator",
+    "CriterionEvidenceAssessment",
     "DetailConversionError",
     "DetailObservation",
     "DetailObservationConverter",
     "EvidenceCheck",
     "EvidenceCheckStatus",
+    "EvidenceConfidenceEvaluator",
     "EvidenceCrossCheckBatch",
     "EvidenceCrossCheckResult",
     "EvidenceCrossCheckService",
     "EvidenceCrossCheckUnitOfWork",
     "EvidenceCrossCheckUnitOfWorkFactory",
+    "EvidenceScopeMismatchError",
     "InvalidCriterionDefinitionError",
+    "InvalidEvidenceTimelineError",
     "InvalidWorkflowTransitionError",
     "MeasurementDefinition",
     "NoCandidatesDiscoveredError",

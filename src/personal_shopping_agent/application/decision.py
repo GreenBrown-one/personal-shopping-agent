@@ -113,6 +113,7 @@ class OfferCostAssessment(DecisionModel):
 class CandidateScoringFoundation(DecisionModel):
     """Pre-confidence utility and offer costs; intentionally not a final ranking."""
 
+    request_id: UUID
     product_id: UUID
     criterion_evaluations: tuple[CriterionEvaluation, ...]
     utility: Decimal | None = Field(default=None, ge=0, le=1)
@@ -454,6 +455,7 @@ class CandidateScoringFoundationBuilder:
             else None
         )
         return CandidateScoringFoundation(
+            request_id=request.id,
             product_id=product.id,
             criterion_evaluations=evaluations,
             utility=utility,
