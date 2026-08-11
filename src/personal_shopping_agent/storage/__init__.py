@@ -9,6 +9,9 @@ from personal_shopping_agent.storage.database import (
     create_sqlite_engine,
     session_scope,
 )
+from personal_shopping_agent.storage.ingestion_unit_of_work import (
+    SQLiteOfferIngestionUnitOfWork,
+)
 from personal_shopping_agent.storage.observation_repository import (
     ObservationKindMismatchError,
     SQLitePlatformObservationRepository,
@@ -30,6 +33,7 @@ __all__ = [
     "EntityNotFoundError",
     "InvalidReferenceError",
     "ObservationKindMismatchError",
+    "SQLiteOfferIngestionUnitOfWork",
     "SQLitePlatformObservationRepository",
     "SQLiteSearchDetailUnitOfWork",
     "SQLiteShoppingRepository",
