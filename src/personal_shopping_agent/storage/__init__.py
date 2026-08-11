@@ -28,6 +28,9 @@ from personal_shopping_agent.storage.repository import (
     InvalidReferenceError,
     SQLiteShoppingRepository,
 )
+from personal_shopping_agent.storage.scoring_unit_of_work import (
+    SQLiteCandidateScoringUnitOfWork,
+)
 from personal_shopping_agent.storage.workflow_repository import (
     ConcurrentWorkflowUpdateError,
     SQLiteWorkflowRepository,
@@ -39,6 +42,7 @@ __all__ = [
     "EntityNotFoundError",
     "InvalidReferenceError",
     "ObservationKindMismatchError",
+    "SQLiteCandidateScoringUnitOfWork",
     "SQLiteEvidenceCrossCheckUnitOfWork",
     "SQLiteOfferIngestionUnitOfWork",
     "SQLitePlatformObservationRepository",
