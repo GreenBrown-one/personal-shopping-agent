@@ -1,5 +1,8 @@
 """Public local-storage adapter API."""
 
+from personal_shopping_agent.storage.collection_unit_of_work import (
+    SQLiteSearchDetailUnitOfWork,
+)
 from personal_shopping_agent.storage.database import (
     create_schema,
     create_session_factory,
@@ -28,6 +31,7 @@ __all__ = [
     "InvalidReferenceError",
     "ObservationKindMismatchError",
     "SQLitePlatformObservationRepository",
+    "SQLiteSearchDetailUnitOfWork",
     "SQLiteShoppingRepository",
     "SQLiteWorkflowRepository",
     "create_schema",
