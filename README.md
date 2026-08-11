@@ -2,7 +2,7 @@
 
 一个面向个人消费者的、证据驱动的购物决策助手。它的目标不是替用户下单，而是把分散的商品参数、报价、适用条件和证据整理成可复核的比较结果。
 
-> 当前状态：M0–M2 已完成；M3 已具备受控浏览器、安全导航、低频访问协调、京东搜索与详情解析、结构化观察存储、请求级事务、严格领域转换和官方证据核验事务；M4 已具备确定性规格规范化、条件效用、报价不确定性调整成本、证据置信度、预算分层、Pareto 前沿和最终排名；M5 已具备不依赖 LLM 的可审计 Markdown 报告及原子持久化。真实购物平台或厂商页面采集、跨平台报价、可插拔 LLM 解释、HTML 报告及 MCP 运行装配仍未启用。
+> 当前状态：M0–M2 已完成；M3 已具备受控浏览器、安全导航、低频访问协调、京东搜索与详情解析、结构化观察存储、请求级事务、严格领域转换和官方证据核验事务；M4 已具备确定性规格规范化、条件效用、报价不确定性调整成本、证据置信度、预算分层、Pareto 前沿和最终排名；M5 已具备不依赖 LLM 的可审计 Markdown 报告、原子持久化，以及受事实白名单约束的 OpenAI 与 DeepSeek 可选解释适配器。真实购物平台或厂商页面采集、跨平台报价、HTML 报告及 MCP 运行装配仍未启用。
 
 ## 产品边界
 
@@ -45,6 +45,37 @@ uv run pyright
 {"service": "personal-shopping-agent", "status": "ok", "version": "0.1.0"}
 ```
 
+## 可选 LLM 解释器
+
+OpenAI 与 DeepSeek 只为已经生成的确定性报告补充自然语言解释。适配器不会读取原始 HTML、截图或
+浏览器会话，只接收有限候选的结构化事实；输出还要通过 Pydantic、报告哈希、候选顺序和事实 ID
+白名单校验。模型未配置、API 不可用、返回空内容或输出越界时，应用会保留原 Markdown 报告并返回
+`deterministic_fallback`。
+
+API 密钥只在运行时传入，不写入配置文件、数据库或报告。模型名要求显式提供，以免代码把会变化的
+供应商默认值固定下来。示例：
+
+```python
+import os
+
+from personal_shopping_agent.llm import (
+    DeepSeekReportExplanationAdapter,
+    OpenAIReportExplanationAdapter,
+)
+
+openai_explainer = OpenAIReportExplanationAdapter(
+    api_key=os.environ["OPENAI_API_KEY"],
+    model=os.environ["OPENAI_MODEL"],
+)
+deepseek_explainer = DeepSeekReportExplanationAdapter(
+    api_key=os.environ["DEEPSEEK_API_KEY"],
+    model=os.environ["DEEPSEEK_MODEL"],
+)
+```
+
+DeepSeek 适配器是纯文本解释器，因此不要求模型具备视觉能力。商品图片或页面视觉信息若未来需要
+处理，应由受控采集/视觉层先转换为带来源的结构化事实，再进入报告；解释器不能直接看图后改写排名。
+
 ## 迭代路线
 
 1. M0：工程基础、测试、静态检查与 CI；
@@ -86,6 +117,13 @@ M4 的第三个切片增加纯证据置信度评估。它按条件权重分别�
 M4 的第四个切片完成最终候选评分。它先执行硬性条件、可比报价、正成本、证据置信度和预算上限闸门，再按正常预算与可选弹性预算分层；预算层由页面选定价格判断，风险调整成本只参与价值、Pareto 和风险惩罚。每个预算层独立计算 Pareto 前沿，并用综合分、每百元价值、有效成本和稳定 Product ID 决胜。所有中间基础、原因码、最终指标和时间都保存在 `candidate_scores` 完整快照中，与 `candidates_scored` 审计事件使用同一 SQLite 事务，任一外键、校验或并发错误都会整体回滚。
 
 M5 的第一个切片增加模型无关的确定性 Markdown 报告。报告直接嵌入原始购物请求、候选分数、Product、实际最佳 Offer 和参与置信度计算的 Evidence，展示预算层、价格、风险、综合分、条件明细、来源链接、排除原因和购买前复核提示。所有页面来源文字先做 Markdown 转义，报告内容使用 SHA-256 绑定完整快照，并与 `report_rendered` 审计事件在同一事务提交。此能力不调用 ChatGPT 或任何其他 LLM；后续解释器只能读取该快照并返回经过类型校验的文字，不能改变事实或名次。
+
+M5 的第二个切片增加模型无关的 `ReportExplanationProvider` 端口，以及 OpenAI Responses Structured
+Outputs 和 DeepSeek OpenAI 兼容 JSON Output 适配器。默认请求只投影报告中的前三个候选，并为预算、
+价格、综合分、证据分、风险、排除码和逐项条件建立稳定事实 ID；模型生成的总览、候选说明和风险
+提醒必须引用这些 ID。OpenAI 返回 Pydantic 结构，DeepSeek 返回 JSON 后在本地执行同一结构校验；
+两者都还要通过报告 ID/哈希、候选范围与顺序、跨商品引用和固定免责声明检查。该解释是非持久化的
+可选覆盖层，不推进工作流、不替代确定性报告，也不获得浏览、下单或支付能力。
 
 淘宝/天猫和拼多多只作为未来适配器候选保留，不在 v1.0 同时接入。当前顺序是先把京东搜索、详情、地区价格、库存语境和证据链做完整，再评估第二个平台，避免在多套不稳定页面结构上过早摊薄测试与维护投入。
 
