@@ -20,6 +20,7 @@ _PROJECT_NAME = "personal-shopping-agent"
 _EXPECTED_CONSOLE_SCRIPTS = {
     "personal-shopping-agent": "personal_shopping_agent.cli:main",
     "personal-shopping-agent-mcp": "personal_shopping_agent.mcp.server:main",
+    "personal-shopping-agent-mcp-jd": "personal_shopping_agent.mcp.server:main_jd",
 }
 _REQUIRED_MEMBERS = {
     "personal_shopping_agent/__about__.py",
@@ -198,6 +199,11 @@ def _verify_clean_install(wheel: Path, wheel_version: str) -> None:
         mcp_cli_executable = executable_directory / (
             "personal-shopping-agent-mcp.exe" if os.name == "nt" else "personal-shopping-agent-mcp"
         )
+        jd_mcp_cli_executable = executable_directory / (
+            "personal-shopping-agent-mcp-jd.exe"
+            if os.name == "nt"
+            else "personal-shopping-agent-mcp-jd"
+        )
         _run(
             (
                 uv_executable,
@@ -212,7 +218,7 @@ def _verify_clean_install(wheel: Path, wheel_version: str) -> None:
         )
         missing_executables = [
             executable.name
-            for executable in (cli_executable, mcp_cli_executable)
+            for executable in (cli_executable, mcp_cli_executable, jd_mcp_cli_executable)
             if not executable.is_file()
         ]
         if missing_executables:

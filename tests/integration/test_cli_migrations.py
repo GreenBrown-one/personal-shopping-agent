@@ -4,6 +4,7 @@ import json
 import os
 import stat
 from pathlib import Path
+from typing import cast
 
 import pytest
 from alembic.config import Config
@@ -14,7 +15,7 @@ from personal_shopping_agent import __version__
 from personal_shopping_agent.cli import main
 from personal_shopping_agent.local_security import LocalFileSecurityError
 from personal_shopping_agent.mcp import create_default_server
-from personal_shopping_agent.runtime_settings import DATABASE_URL_ENV
+from personal_shopping_agent.runtime_settings import DATABASE_URL_ENV, LIVE_JD_ACCESS_ENV
 from personal_shopping_agent.storage import (
     DatabaseMigrationError,
     DatabaseMigrationStatus,
@@ -89,6 +90,59 @@ def test_cli_migrate_creates_parent_and_default_server_accepts_current_schema(
     assert require_current_database(database_url).ready is True
     server = create_default_server({DATABASE_URL_ENV: database_url})
     assert server.name == "personal-shopping-agent"
+
+
+def test_cli_generates_reviewable_default_and_live_mcp_configurations(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "pyproject.toml").write_text("[project]\n")
+    (tmp_path / "uv.lock").write_text("version = 1\n")
+    (tmp_path / "src" / "personal_shopping_agent").mkdir(parents=True)
+    project_directory = str(tmp_path.resolve())
+
+    assert main(["mcp-config", "--project-directory", project_directory]) == 0
+    offline = _output(capsys)
+    assert offline["command"] == "mcp_config"
+    assert offline["live_jd"] is False
+    assert offline["ok"] is True
+    assert offline["warning"] == "The default server does not access shopping platforms."
+    config = offline["config"]
+    assert isinstance(config, dict)
+    servers = cast(dict[str, object], config["mcpServers"])
+    details = cast(dict[str, object], servers["personal-shopping-agent"])
+    args = cast(list[str], details["args"])
+    assert args[-1] == "personal-shopping-agent-mcp"
+
+    assert main(["mcp-config", "--project-directory", project_directory, "--live-jd"]) == 0
+    live = _output(capsys)
+    assert live["live_jd"] is True
+    assert live["warning"] == (
+        "Live JD access still requires Chromium installation and manual acceptance."
+    )
+    live_config = live["config"]
+    assert isinstance(live_config, dict)
+    live_servers = cast(dict[str, object], live_config["mcpServers"])
+    live_details = cast(dict[str, object], live_servers["personal-shopping-agent"])
+    live_args = cast(list[str], live_details["args"])
+    live_environment = cast(dict[str, str], live_details["env"])
+    assert live_args[-1] == "personal-shopping-agent-mcp-jd"
+    assert live_environment[LIVE_JD_ACCESS_ENV] == "true"
+
+
+def test_cli_sanitizes_an_invalid_mcp_project_directory(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    missing = tmp_path / "sensitive-name"
+
+    assert main(["mcp-config", "--project-directory", str(missing)]) == 2
+    assert _output(capsys) == {
+        "command": "mcp_config",
+        "error_code": "source_checkout_invalid",
+        "message": "Select a complete Personal Shopping Agent source checkout.",
+        "ok": False,
+    }
 
 
 @pytest.mark.parametrize("database_url", ["not a url", "postgresql://localhost/shopping"])

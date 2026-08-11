@@ -1,6 +1,8 @@
 """Official MCP Python SDK v2 adapter for the shopping workflow service."""
 
-from collections.abc import Mapping
+from collections.abc import AsyncGenerator, Callable, Mapping
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from typing import Protocol
 from uuid import UUID
 
 from mcp.server import MCPServer
@@ -21,6 +23,13 @@ from personal_shopping_agent.application import (
     ShoppingWorkflowService,
     WorkflowSnapshot,
 )
+from personal_shopping_agent.browser import (
+    BrowserManager,
+    BrowserManagerSettings,
+    ControlledPageCollector,
+    NavigationPolicy,
+    StatusPageCollector,
+)
 from personal_shopping_agent.llm import (
     ExplanationProviderKind,
     LLMExplanationSettings,
@@ -32,9 +41,14 @@ from personal_shopping_agent.mcp.schemas import (
     RunShoppingPipelineInput,
     StartShoppingWorkflowInput,
 )
+from personal_shopping_agent.platforms.jd import JD_ITEM_HOST, JD_SEARCH_HOST
 from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
-from personal_shopping_agent.runtime import create_jd_pipeline_service
-from personal_shopping_agent.runtime_settings import database_url_from_environment
+from personal_shopping_agent.runtime import NoOfficialEvidenceProvider, create_jd_pipeline_service
+from personal_shopping_agent.runtime_settings import (
+    LiveJDConfigurationError,
+    database_url_from_environment,
+    load_live_jd_settings,
+)
 from personal_shopping_agent.storage import (
     SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
@@ -69,6 +83,27 @@ PIPELINE_WRITE = ToolAnnotations(
     open_world_hint=True,
 )
 
+SHOPPING_REQUEST_GUIDE = """Prepare one shopping request from the user's own words.
+
+First call shopping_agent_status and do not assume unavailable capabilities exist. Identify the
+product category, normal budget, optional stretch budget, currency, region, and explicit criteria.
+Ask a concise follow-up when a required value is missing or when a hard requirement lacks a unit or
+direction. Preserve uncertainty instead of inventing specifications or prices. After confirmation,
+call start_shopping_workflow with only the user's stated constraints. Never claim that collection,
+ranking, purchase, or payment occurred unless the corresponding registered tool actually succeeds.
+"""
+
+
+class ManagedStatusPageCollector(StatusPageCollector, Protocol):
+    """Status-aware collector with a server-owned asynchronous lifecycle."""
+
+    async def start(self) -> None: ...
+
+    async def close(self) -> None: ...
+
+
+ServerLifespan = Callable[[MCPServer[None]], AbstractAsyncContextManager[None]]
+
 
 def create_mcp_server(
     workflow_service: ShoppingWorkflowService,
@@ -77,7 +112,8 @@ def create_mcp_server(
     *,
     explanation_provider: ExplanationProviderKind = ExplanationProviderKind.DISABLED,
     pipeline_service: ShoppingDecisionPipelineService | None = None,
-) -> MCPServer:
+    lifespan: ServerLifespan | None = None,
+) -> MCPServer[None]:
     """Register a deterministic, dependency-injected MCP server."""
 
     server = MCPServer(
@@ -92,7 +128,18 @@ def create_mcp_server(
             "An end-to-end JD pipeline tool is present only in an explicitly configured server. "
             "Checkout and payment are never available."
         ),
+        lifespan=lifespan,
     )
+
+    @server.prompt(
+        name="prepare_shopping_request",
+        title="Prepare a structured shopping request",
+        description="Clarify natural-language needs before starting a typed local workflow.",
+    )
+    def _prepare_shopping_request() -> str:
+        """Return static guidance without tools, storage, models, or network access."""
+
+        return SHOPPING_REQUEST_GUIDE
 
     @server.tool(
         name="shopping_agent_status",
@@ -104,7 +151,7 @@ def create_mcp_server(
         """Return an honest summary of implemented and unavailable capabilities."""
 
         return AgentCapabilities(
-            milestone="M6" if pipeline_service is not None else "M5",
+            milestone="M7",
             local_workflows=True,
             local_storage=True,
             end_to_end_pipeline=pipeline_service is not None,
@@ -117,9 +164,10 @@ def create_mcp_server(
             llm_explanation_provider=explanation_provider.value,
             automatic_purchase=False,
             message=(
-                "M6 JD pipeline is explicitly configured and resumable."
+                "M7 live-JD entry is explicitly configured and resumable; real page "
+                "compatibility still requires manual acceptance."
                 if pipeline_service is not None
-                else "M5 report tools are available; the end-to-end pipeline is not configured."
+                else "M7 local MCP is ready; live platform collection is not configured."
             ),
         )
 
@@ -211,6 +259,7 @@ def create_mcp_server(
         _ = _run_shopping_pipeline
 
     _ = (
+        _prepare_shopping_request,
         _shopping_agent_status,
         _start_shopping_workflow,
         _get_shopping_workflow,
@@ -227,7 +276,8 @@ def _create_server_for_session_factory(
     settings: LLMExplanationSettings,
     *,
     pipeline_service: ShoppingDecisionPipelineService | None = None,
-) -> MCPServer:
+    lifespan: ServerLifespan | None = None,
+) -> MCPServer[None]:
     return create_mcp_server(
         ShoppingWorkflowService(SQLiteWorkflowRepository(session_factory)),
         ShoppingReportService(lambda: SQLiteShoppingReportUnitOfWork(session_factory)),
@@ -238,6 +288,7 @@ def _create_server_for_session_factory(
         ),
         explanation_provider=settings.provider,
         pipeline_service=pipeline_service,
+        lifespan=lifespan,
     )
 
 
@@ -245,7 +296,7 @@ def create_server_for_database(
     database_url: str,
     *,
     environment: Mapping[str, str] | None = None,
-) -> MCPServer:
+) -> MCPServer[None]:
     """Construct the production adapter graph for an already migrated SQLite database."""
 
     engine = create_sqlite_engine(database_url)
@@ -260,7 +311,8 @@ def create_jd_pipeline_server_for_database(
     official_evidence_provider: OfficialEvidenceProvider,
     *,
     environment: Mapping[str, str] | None = None,
-) -> MCPServer:
+    lifespan: ServerLifespan | None = None,
+) -> MCPServer[None]:
     """Compose an explicitly enabled JD pipeline around caller-owned safe external ports."""
 
     engine = create_sqlite_engine(database_url)
@@ -275,12 +327,55 @@ def create_jd_pipeline_server_for_database(
         session_factory,
         settings,
         pipeline_service=pipeline_service,
+        lifespan=lifespan,
+    )
+
+
+def _collector_lifespan(collector: ManagedStatusPageCollector) -> ServerLifespan:
+    @asynccontextmanager
+    async def lifespan(_: MCPServer[None]) -> AsyncGenerator[None, None]:
+        await collector.start()
+        try:
+            yield None
+        finally:
+            await collector.close()
+
+    return lifespan
+
+
+def create_live_jd_server_for_database(
+    database_url: str,
+    *,
+    environment: Mapping[str, str] | None = None,
+    managed_collector: ManagedStatusPageCollector | None = None,
+) -> MCPServer[None]:
+    """Construct the explicitly enabled JD server with one managed browser lifecycle."""
+
+    settings = load_live_jd_settings(environment)
+    if not settings.enabled:
+        raise LiveJDConfigurationError(
+            "live_jd_disabled",
+            "Live JD access must be explicitly enabled.",
+        )
+    collector = managed_collector
+    if collector is None:
+        collector = BrowserManager(
+            NavigationPolicy((JD_SEARCH_HOST, JD_ITEM_HOST)),
+            settings=BrowserManagerSettings(headless=settings.headless),
+        )
+    bounded_collector = ControlledPageCollector(collector)
+    return create_jd_pipeline_server_for_database(
+        database_url,
+        bounded_collector,
+        NoOfficialEvidenceProvider(),
+        environment=environment,
+        lifespan=_collector_lifespan(collector),
     )
 
 
 def create_default_server(
     environment: Mapping[str, str] | None = None,
-) -> MCPServer:
+) -> MCPServer[None]:
     """Construct the default server only after its packaged schema is current."""
 
     database_url = database_url_from_environment(environment)
@@ -288,7 +383,29 @@ def create_default_server(
     return create_server_for_database(database_url, environment=environment)
 
 
+def create_live_jd_server(
+    environment: Mapping[str, str] | None = None,
+    *,
+    managed_collector: ManagedStatusPageCollector | None = None,
+) -> MCPServer[None]:
+    """Construct an explicitly enabled live-JD server after the same schema gate."""
+
+    database_url = database_url_from_environment(environment)
+    require_current_database(database_url)
+    return create_live_jd_server_for_database(
+        database_url,
+        environment=environment,
+        managed_collector=managed_collector,
+    )
+
+
 def main() -> None:  # pragma: no cover - blocking stdio transport entry point
     """Run the MCP server over stdio for a local MCP-compatible host."""
 
     create_default_server().run(transport="stdio")
+
+
+def main_jd() -> None:  # pragma: no cover - blocking stdio transport entry point
+    """Run the explicitly enabled, lifecycle-managed JD MCP server over stdio."""
+
+    create_live_jd_server().run(transport="stdio")
