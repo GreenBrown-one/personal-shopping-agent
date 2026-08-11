@@ -19,6 +19,10 @@ from personal_shopping_agent.application import (
     WorkflowDeletionPlanStaleError,
 )
 from personal_shopping_agent.health import health_check
+from personal_shopping_agent.host_config import (
+    SourceCheckoutError,
+    build_source_mcp_configuration,
+)
 from personal_shopping_agent.runtime_settings import database_url_from_environment
 from personal_shopping_agent.storage import (
     DatabaseMigrationError,
@@ -39,6 +43,20 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="personal-shopping-agent")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("health", help="print the process health contract")
+    mcp_config_parser = commands.add_parser(
+        "mcp-config",
+        help="print a secret-free generic stdio MCP configuration",
+    )
+    mcp_config_parser.add_argument(
+        "--project-directory",
+        default=".",
+        help="complete source checkout; defaults to the current directory",
+    )
+    mcp_config_parser.add_argument(
+        "--live-jd",
+        action="store_true",
+        help="select the explicit live-JD entry point instead of the offline default",
+    )
     for name, help_text in (
         ("doctor", "check whether the local database schema is current"),
         ("migrate", "apply packaged forward database migrations"),
@@ -96,6 +114,39 @@ def _emit_data_error(error_code: str, message: str, *, command: str) -> None:
             "ok": False,
         }
     )
+
+
+def _run_mcp_config(namespace: argparse.Namespace) -> int:
+    live_jd = cast(bool, namespace.live_jd)
+    try:
+        configuration = build_source_mcp_configuration(
+            Path(cast(str, namespace.project_directory)),
+            live_jd=live_jd,
+        )
+    except SourceCheckoutError:
+        _emit(
+            {
+                "command": "mcp_config",
+                "error_code": "source_checkout_invalid",
+                "message": "Select a complete Personal Shopping Agent source checkout.",
+                "ok": False,
+            }
+        )
+        return 2
+    _emit(
+        {
+            "command": "mcp_config",
+            "config": configuration,
+            "live_jd": live_jd,
+            "ok": True,
+            "warning": (
+                "Live JD access still requires Chromium installation and manual acceptance."
+                if live_jd
+                else "The default server does not access shopping platforms."
+            ),
+        }
+    )
+    return 0
 
 
 def _run_data_command(
@@ -245,6 +296,9 @@ def main(
             }
         )
         return 0
+
+    if command_name == "mcp-config":
+        return _run_mcp_config(namespace)
 
     if command_name == "data":
         return _run_data_command(namespace, environment=environment)

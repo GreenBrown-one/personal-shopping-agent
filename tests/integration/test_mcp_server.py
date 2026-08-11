@@ -8,6 +8,7 @@ from uuid import UUID
 
 from mcp import Client
 from mcp.server import MCPServer
+from mcp.types import TextContent
 from pydantic import HttpUrl
 from sqlalchemy import Engine
 
@@ -236,6 +237,16 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
 
     async def scenario() -> None:
         async with Client(server, raise_exceptions=True) as client:
+            prompts = await client.list_prompts()
+            assert [prompt.name for prompt in prompts.prompts] == ["prepare_shopping_request"]
+            prepared = await client.get_prompt("prepare_shopping_request")
+            assert len(prepared.messages) == 1
+            prompt_content = prepared.messages[0].content
+            assert isinstance(prompt_content, TextContent)
+            assert "shopping_agent_status" in prompt_content.text
+            assert "start_shopping_workflow" in prompt_content.text
+            assert "Never claim" in prompt_content.text
+
             listed = await client.list_tools()
             assert [tool.name for tool in listed.tools] == [
                 "shopping_agent_status",
@@ -268,7 +279,7 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
 
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
-            assert status.structured_content["milestone"] == "M5"
+            assert status.structured_content["milestone"] == "M7"
             assert status.structured_content["end_to_end_pipeline"] is False
             assert status.structured_content["platform_collection"] is False
             assert status.structured_content["ranking"] is False
@@ -278,6 +289,9 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
             assert status.structured_content["llm_explanations"] is False
             assert status.structured_content["llm_explanation_provider"] == "disabled"
             assert status.structured_content["automatic_purchase"] is False
+            assert status.structured_content["message"] == (
+                "M7 local MCP is ready; live platform collection is not configured."
+            )
 
             started_result = await client.call_tool(
                 "start_shopping_workflow",

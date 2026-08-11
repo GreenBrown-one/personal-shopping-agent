@@ -95,7 +95,7 @@ def test_explicit_jd_pipeline_runs_resumes_and_keeps_mcp_boundaries(tmp_path: Pa
 
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
-            assert status.structured_content["milestone"] == "M6"
+            assert status.structured_content["milestone"] == "M7"
             assert status.structured_content["end_to_end_pipeline"] is True
             assert status.structured_content["platform_collection"] is True
             assert status.structured_content["ranking"] is True
