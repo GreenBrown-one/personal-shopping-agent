@@ -3,15 +3,15 @@
 from pathlib import Path
 
 from alembic import command
-from alembic.config import Config
 from sqlalchemy import create_engine, inspect, text
+
+from personal_shopping_agent.storage import create_migration_config
 
 
 def test_initial_migration_upgrades_and_downgrades(tmp_path: Path) -> None:
     database_path = tmp_path / "migrated.db"
     database_url = f"sqlite:///{database_path}"
-    config = Config("alembic.ini")
-    config.set_main_option("sqlalchemy.url", database_url)
+    config = create_migration_config(database_url)
 
     command.upgrade(config, "head")
 

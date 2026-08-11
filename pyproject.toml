@@ -21,6 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
+personal-shopping-agent = "personal_shopping_agent.cli:main"
 personal-shopping-agent-mcp = "personal_shopping_agent.mcp.server:main"
 
 [dependency-groups]
@@ -34,6 +35,9 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/personal_shopping_agent"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"migrations" = "personal_shopping_agent/migrations"
 
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"

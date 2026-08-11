@@ -1,6 +1,5 @@
 """Official MCP Python SDK v2 adapter for the shopping workflow service."""
 
-import os
 from collections.abc import Mapping
 from uuid import UUID
 
@@ -34,16 +33,15 @@ from personal_shopping_agent.mcp.schemas import (
 )
 from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
 from personal_shopping_agent.runtime import create_jd_pipeline_service
+from personal_shopping_agent.runtime_settings import database_url_from_environment
 from personal_shopping_agent.storage import (
     SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
     create_session_factory,
     create_sqlite_engine,
+    require_current_database,
 )
 from personal_shopping_agent.storage.workflow_repository import SQLiteWorkflowRepository
-
-DEFAULT_DATABASE_URL = "sqlite:///data/personal-shopping-agent.db"
-DATABASE_URL_ENV = "PERSONAL_SHOPPING_DATABASE_URL"
 
 READ_ONLY = ToolAnnotations(
     read_only_hint=True,
@@ -279,8 +277,17 @@ def create_jd_pipeline_server_for_database(
     )
 
 
+def create_default_server(
+    environment: Mapping[str, str] | None = None,
+) -> MCPServer:
+    """Construct the default server only after its packaged schema is current."""
+
+    database_url = database_url_from_environment(environment)
+    require_current_database(database_url)
+    return create_server_for_database(database_url, environment=environment)
+
+
 def main() -> None:  # pragma: no cover - blocking stdio transport entry point
     """Run the MCP server over stdio for a local MCP-compatible host."""
 
-    database_url = os.environ.get(DATABASE_URL_ENV, DEFAULT_DATABASE_URL)
-    create_server_for_database(database_url).run(transport="stdio")
+    create_default_server().run(transport="stdio")

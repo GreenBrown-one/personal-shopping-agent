@@ -7,6 +7,7 @@ from personal_shopping_agent.mcp.schemas import (
     StartShoppingWorkflowInput,
 )
 from personal_shopping_agent.mcp.server import (
+    create_default_server,
     create_jd_pipeline_server_for_database,
     create_mcp_server,
     create_server_for_database,
@@ -17,6 +18,7 @@ __all__ = [
     "CriterionInput",
     "RunShoppingPipelineInput",
     "StartShoppingWorkflowInput",
+    "create_default_server",
     "create_jd_pipeline_server_for_database",
     "create_mcp_server",
     "create_server_for_database",

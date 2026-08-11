@@ -15,6 +15,16 @@ from personal_shopping_agent.storage.database import (
 from personal_shopping_agent.storage.ingestion_unit_of_work import (
     SQLiteOfferIngestionUnitOfWork,
 )
+from personal_shopping_agent.storage.migrations import (
+    DatabaseMigrationError,
+    DatabaseMigrationStatus,
+    DatabaseSchemaNotReadyError,
+    create_migration_config,
+    inspect_database_migrations,
+    migration_script_location,
+    require_current_database,
+    upgrade_database,
+)
 from personal_shopping_agent.storage.normalization_unit_of_work import (
     SQLiteSpecificationNormalizationUnitOfWork,
 )
@@ -44,6 +54,9 @@ from personal_shopping_agent.storage.workflow_repository import (
 
 __all__ = [
     "ConcurrentWorkflowUpdateError",
+    "DatabaseMigrationError",
+    "DatabaseMigrationStatus",
+    "DatabaseSchemaNotReadyError",
     "DuplicateEntityError",
     "EntityNotFoundError",
     "InvalidReferenceError",
@@ -58,8 +71,13 @@ __all__ = [
     "SQLiteShoppingRepository",
     "SQLiteSpecificationNormalizationUnitOfWork",
     "SQLiteWorkflowRepository",
+    "create_migration_config",
     "create_schema",
     "create_session_factory",
     "create_sqlite_engine",
+    "inspect_database_migrations",
+    "migration_script_location",
+    "require_current_database",
     "session_scope",
+    "upgrade_database",
 ]
