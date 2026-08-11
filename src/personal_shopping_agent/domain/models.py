@@ -191,6 +191,7 @@ class Evidence(DomainModel):
     """One provenance-bearing observation; conflicting observations remain separate rows."""
 
     id: UUID = Field(default_factory=uuid4)
+    request_id: UUID | None = None
     subject_type: EvidenceSubjectType
     subject_id: UUID
     field_path: str = Field(min_length=1, max_length=255)
