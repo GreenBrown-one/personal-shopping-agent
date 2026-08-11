@@ -267,6 +267,9 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
             assert status.structured_content["milestone"] == "M5"
+            assert status.structured_content["end_to_end_pipeline"] is False
+            assert status.structured_content["platform_collection"] is False
+            assert status.structured_content["ranking"] is False
             assert status.structured_content["cross_platform_comparison"] is False
             assert status.structured_content["deterministic_reports"] is True
             assert status.structured_content["html_reports"] is True

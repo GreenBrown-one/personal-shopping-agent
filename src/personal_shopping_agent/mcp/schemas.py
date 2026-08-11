@@ -1,9 +1,11 @@
 """MCP-specific input and capability models kept outside the core domain."""
 
 from decimal import Decimal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from personal_shopping_agent.application import ShoppingPipelineOptions
 from personal_shopping_agent.domain import (
     Budget,
     Money,
@@ -66,12 +68,29 @@ class StartShoppingWorkflowInput(MCPModel):
         )
 
 
+class RunShoppingPipelineInput(MCPModel):
+    """Explicit bounded request to resume all configured shopping stages."""
+
+    workflow_id: UUID
+    maximum_candidates: int = Field(default=20, ge=1, le=100)
+    maximum_details: int = Field(default=5, ge=1, le=10)
+
+    def to_options(self) -> ShoppingPipelineOptions:
+        """Reuse the application boundary for cross-field limit validation."""
+
+        return ShoppingPipelineOptions(
+            maximum_candidates=self.maximum_candidates,
+            maximum_details=self.maximum_details,
+        )
+
+
 class AgentCapabilities(MCPModel):
     """Honest feature status so the host cannot assume unfinished abilities exist."""
 
     milestone: str
     local_workflows: bool
     local_storage: bool
+    end_to_end_pipeline: bool
     platform_collection: bool
     cross_platform_comparison: bool
     ranking: bool

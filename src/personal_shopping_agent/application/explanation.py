@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Protocol, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from personal_shopping_agent.application.reporting import (
     RenderedShoppingReport,
@@ -18,6 +18,7 @@ from personal_shopping_agent.application.reporting import (
     escape_markdown,
 )
 from personal_shopping_agent.domain import Money
+from personal_shopping_agent.serialization import JsonContractModel
 
 EXPLANATION_SCHEMA_VERSION = "m5-explanation-v1"
 DISCLAIMER_FACT_ID = "report.disclaimer"
@@ -25,7 +26,7 @@ _FACT_ID_PATTERN = r"^[a-z0-9][a-z0-9._:-]{0,199}$"
 _LINK_PATTERN = re.compile(r"(?:https?://|www\.|\[[^\]]+\]\([^\)]+\))", re.IGNORECASE)
 
 
-class ExplanationModel(BaseModel):
+class ExplanationModel(JsonContractModel):
     """Strict immutable base for requests and untrusted provider output."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)

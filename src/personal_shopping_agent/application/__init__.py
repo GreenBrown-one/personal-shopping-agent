@@ -111,6 +111,13 @@ from personal_shopping_agent.application.observations import (
     PlatformObservationStore,
     SearchObservation,
 )
+from personal_shopping_agent.application.pipeline import (
+    PIPELINE_STATE_SEQUENCE,
+    ShoppingDecisionPipelineService,
+    ShoppingPipelineOptions,
+    ShoppingPipelineResult,
+    ShoppingPipelineStateError,
+)
 from personal_shopping_agent.application.ranking import (
     BudgetStatus,
     CandidateDecisionInput,
@@ -159,6 +166,7 @@ from personal_shopping_agent.application.workflow import (
 )
 
 __all__ = [
+    "PIPELINE_STATE_SEQUENCE",
     "BudgetStatus",
     "CandidateDecisionInput",
     "CandidateDiscovery",
@@ -252,7 +260,11 @@ __all__ = [
     "SearchDetailUnitOfWork",
     "SearchDetailUnitOfWorkFactory",
     "SearchObservation",
+    "ShoppingDecisionPipelineService",
     "ShoppingDecisionReport",
+    "ShoppingPipelineOptions",
+    "ShoppingPipelineResult",
+    "ShoppingPipelineStateError",
     "ShoppingReportAccessService",
     "ShoppingReportBuilder",
     "ShoppingReportExplanation",
