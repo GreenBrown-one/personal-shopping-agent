@@ -1,25 +1,233 @@
 """In-memory protocol tests for the official MCP Python SDK v2 adapter."""
 
 import asyncio
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
+from uuid import UUID
 
 from mcp import Client
+from mcp.server import MCPServer
+from pydantic import HttpUrl
+from sqlalchemy import Engine
 
-from personal_shopping_agent.application import ShoppingWorkflowService, WorkflowSnapshot
+from personal_shopping_agent.application import (
+    CandidateDecisionInput,
+    CandidateEvidenceConfidence,
+    CandidateRankingEngine,
+    CandidateScoringFoundation,
+    CriterionEvaluation,
+    CriterionEvaluationStatus,
+    CriterionEvidenceAssessment,
+    ExplanationStatus,
+    OfferCostAssessment,
+    RenderedShoppingReport,
+    RenderedShoppingReportPresentation,
+    ShoppingReportAccessService,
+    ShoppingReportResult,
+    ShoppingReportService,
+    ShoppingWorkflowService,
+    WorkflowSnapshot,
+    WorkflowState,
+)
+from personal_shopping_agent.domain import (
+    Budget,
+    Evidence,
+    EvidenceSourceType,
+    EvidenceSubjectType,
+    Money,
+    Offer,
+    PriceBreakdown,
+    PriceKind,
+    Product,
+    ShoppingCriterion,
+    ShoppingRequest,
+    StoreType,
+)
+from personal_shopping_agent.llm import (
+    ExplanationProviderKind,
+    LLMExplanationSettings,
+    create_report_presentation_service,
+)
 from personal_shopping_agent.mcp.server import create_mcp_server, create_server_for_database
 from personal_shopping_agent.storage import (
+    SQLiteShoppingReportRepository,
+    SQLiteShoppingReportUnitOfWork,
+    SQLiteShoppingRepository,
     SQLiteWorkflowRepository,
     create_schema,
     create_session_factory,
     create_sqlite_engine,
+    session_scope,
 )
+from personal_shopping_agent.storage.scoring_unit_of_work import candidate_score_record
+
+NOW = datetime(2026, 8, 9, 20, 0, tzinfo=UTC)
+REPORT_AT = NOW + timedelta(seconds=1)
+
+
+def create_test_server(
+    engine: Engine,
+    *,
+    explanation_provider: ExplanationProviderKind = ExplanationProviderKind.DISABLED,
+) -> MCPServer:
+    """Compose the same report boundaries as production around one in-memory database."""
+
+    session_factory = create_session_factory(engine)
+    return create_mcp_server(
+        ShoppingWorkflowService(SQLiteWorkflowRepository(session_factory)),
+        ShoppingReportService(
+            lambda: SQLiteShoppingReportUnitOfWork(session_factory),
+            clock=lambda: REPORT_AT,
+        ),
+        ShoppingReportAccessService(
+            SQLiteShoppingReportRepository(session_factory),
+            create_report_presentation_service(LLMExplanationSettings()),
+        ),
+        explanation_provider=explanation_provider,
+    )
+
+
+def seed_scored_workflow(engine: Engine) -> UUID:
+    """Persist one complete scored candidate so MCP report tools can run end to end."""
+
+    session_factory = create_session_factory(engine)
+    workflow_service = ShoppingWorkflowService(
+        SQLiteWorkflowRepository(session_factory),
+        clock=lambda: NOW,
+    )
+    request = ShoppingRequest(
+        query="续航优先的测试手机",
+        category="smartphone",
+        budget=Budget(maximum=Money(amount=Decimal("5000"))),
+        criteria=(
+            ShoppingCriterion(
+                key="battery_capacity",
+                weight=Decimal("1"),
+                minimum=Decimal("4000"),
+                preferred=Decimal("6000"),
+                unit="mAh",
+            ),
+        ),
+        created_at=NOW,
+    )
+    snapshot = workflow_service.start(request)
+    for state in (
+        WorkflowState.CANDIDATES_DISCOVERED,
+        WorkflowState.OFFERS_COLLECTED,
+        WorkflowState.EVIDENCE_CROSS_CHECKED,
+        WorkflowState.DATA_NORMALIZED,
+        WorkflowState.CANDIDATES_SCORED,
+    ):
+        snapshot = workflow_service.advance(
+            snapshot.workflow.id,
+            state,
+            reason=f"seed_{state.value}",
+        )
+
+    product = Product(
+        brand="Example",
+        model="M5",
+        category="smartphone",
+        canonical_name="Example M5",
+    )
+    offer = Offer(
+        product_id=product.id,
+        platform="JD",
+        seller="JD self operated",
+        store_type=StoreType.PLATFORM_SELF_OPERATED,
+        url=HttpUrl("https://item.example.com/m5"),
+        region="云南省曲靖市",
+        captured_at=NOW,
+        price=PriceBreakdown(estimated_total_cost=Money(amount=Decimal("4000"))),
+        in_stock=True,
+    )
+    evidence = Evidence(
+        request_id=request.id,
+        subject_type=EvidenceSubjectType.PRODUCT,
+        subject_id=product.id,
+        field_path="specifications.battery_capacity",
+        source_type=EvidenceSourceType.MANUFACTURER_OFFICIAL,
+        source_url=HttpUrl("https://manufacturer.example.com/m5/specifications"),
+        source_title="Example M5 official specifications",
+        captured_at=NOW,
+        observed_value="5000 mAh",
+    )
+    repository = SQLiteShoppingRepository(session_factory)
+    repository.add_product(product)
+    repository.add_offer(offer)
+    repository.add_evidence(evidence)
+
+    evaluation = CriterionEvaluation(
+        key="battery_capacity",
+        weight=Decimal("1"),
+        hard_requirement=False,
+        observed_values=(Decimal("5000"),),
+        status=CriterionEvaluationStatus.SATISFIED,
+        score=Decimal("0.8"),
+        reason_code="test",
+    )
+    price = Money(amount=Decimal("4000"))
+    foundation = CandidateScoringFoundation(
+        request_id=request.id,
+        product_id=product.id,
+        criterion_evaluations=(evaluation,),
+        utility=Decimal("0.8"),
+        hard_requirements_met=True,
+        offer_costs=(
+            OfferCostAssessment(
+                offer_id=offer.id,
+                product_id=product.id,
+                selected_price_kind=PriceKind.ESTIMATED_TOTAL,
+                selected_price=price,
+                risk_coefficient=Decimal("0"),
+                effective_cost=price,
+                comparable=True,
+                reason_codes=("test",),
+            ),
+        ),
+        best_offer_id=offer.id,
+    )
+    confidence = CandidateEvidenceConfidence(
+        request_id=request.id,
+        product_id=product.id,
+        criteria=(
+            CriterionEvidenceAssessment(
+                key="battery_capacity",
+                weight=Decimal("1"),
+                complete=True,
+                source_reliability=Decimal("0.9"),
+                freshness=Decimal("1"),
+                consistency=Decimal("1"),
+                confidence=Decimal("0.9"),
+                evidence_ids=(evidence.id,),
+                reason_codes=("test",),
+            ),
+        ),
+        completeness=Decimal("1"),
+        source_reliability=Decimal("0.9"),
+        freshness=Decimal("1"),
+        consistency=Decimal("1"),
+        evidence_confidence=Decimal("0.9"),
+        base_utility=Decimal("0.8"),
+        adjusted_utility=Decimal("0.72"),
+        assessed_at=NOW,
+    )
+    batch = CandidateRankingEngine().rank(
+        request=request,
+        workflow_id=snapshot.workflow.id,
+        candidates=(CandidateDecisionInput(foundation=foundation, confidence=confidence),),
+        scored_at=NOW,
+    )
+    with session_scope(session_factory) as session:
+        session.add(candidate_score_record(batch.scores[0]))
+    return snapshot.workflow.id
 
 
 def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> None:
     engine = create_sqlite_engine("sqlite://")
     create_schema(engine)
-    service = ShoppingWorkflowService(SQLiteWorkflowRepository(create_session_factory(engine)))
-    server = create_mcp_server(service)
+    server = create_test_server(engine)
 
     async def scenario() -> None:
         async with Client(server, raise_exceptions=True) as client:
@@ -28,17 +236,33 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
                 "shopping_agent_status",
                 "start_shopping_workflow",
                 "get_shopping_workflow",
+                "render_shopping_report",
+                "get_shopping_report",
+                "explain_shopping_report",
             ]
             assert listed.tools[0].annotations is not None
             assert listed.tools[0].annotations.read_only_hint is True
             assert listed.tools[1].annotations is not None
             assert listed.tools[1].annotations.read_only_hint is False
             assert listed.tools[1].annotations.destructive_hint is False
+            assert listed.tools[3].annotations is not None
+            assert listed.tools[3].annotations.read_only_hint is False
+            assert listed.tools[4].annotations is not None
+            assert listed.tools[4].annotations.read_only_hint is True
+            assert listed.tools[4].annotations.idempotent_hint is True
+            assert listed.tools[4].annotations.open_world_hint is False
+            assert listed.tools[5].annotations is not None
+            assert listed.tools[5].annotations.read_only_hint is True
+            assert listed.tools[5].annotations.idempotent_hint is False
+            assert listed.tools[5].annotations.open_world_hint is True
 
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
-            assert status.structured_content["milestone"] == "M2"
+            assert status.structured_content["milestone"] == "M5"
             assert status.structured_content["cross_platform_comparison"] is False
+            assert status.structured_content["deterministic_reports"] is True
+            assert status.structured_content["llm_explanations"] is False
+            assert status.structured_content["llm_explanation_provider"] == "disabled"
             assert status.structured_content["automatic_purchase"] is False
 
             started_result = await client.call_tool(
@@ -79,13 +303,69 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
     engine.dispose()
 
 
+def test_mcp_report_tools_render_read_and_explicitly_fallback_without_llm() -> None:
+    engine = create_sqlite_engine("sqlite://")
+    create_schema(engine)
+    workflow_id = seed_scored_workflow(engine)
+    server = create_test_server(engine)
+
+    async def scenario() -> None:
+        async with Client(server, raise_exceptions=True) as client:
+            rendered_result = await client.call_tool(
+                "render_shopping_report",
+                {"workflow_id": str(workflow_id)},
+            )
+            assert rendered_result.structured_content is not None
+            committed = ShoppingReportResult.model_validate(rendered_result.structured_content)
+            assert committed.snapshot.workflow.state is WorkflowState.REPORT_RENDERED
+
+            stored_result = await client.call_tool(
+                "get_shopping_report",
+                {"workflow_id": str(workflow_id)},
+            )
+            assert stored_result.structured_content is not None
+            stored = RenderedShoppingReport.model_validate(stored_result.structured_content)
+            assert stored == committed.rendered
+
+            explained_result = await client.call_tool(
+                "explain_shopping_report",
+                {"workflow_id": str(workflow_id)},
+            )
+            assert explained_result.structured_content is not None
+            presentation = RenderedShoppingReportPresentation.model_validate(
+                explained_result.structured_content
+            )
+            assert presentation.result.status is ExplanationStatus.DETERMINISTIC_FALLBACK
+            assert presentation.content == stored.content
+            assert presentation.content_sha256 == stored.content_sha256
+
+    asyncio.run(scenario())
+    engine.dispose()
+
+
+def test_mcp_status_reports_an_explicitly_enabled_explanation_provider() -> None:
+    engine = create_sqlite_engine("sqlite://")
+    create_schema(engine)
+    server = create_test_server(engine, explanation_provider=ExplanationProviderKind.OPENAI)
+
+    async def scenario() -> None:
+        async with Client(server, raise_exceptions=True) as client:
+            result = await client.call_tool("shopping_agent_status", {})
+            assert result.structured_content is not None
+            assert result.structured_content["llm_explanations"] is True
+            assert result.structured_content["llm_explanation_provider"] == "openai"
+
+    asyncio.run(scenario())
+    engine.dispose()
+
+
 def test_database_server_factory_uses_existing_migrated_schema(tmp_path: Path) -> None:
     database_path = tmp_path / "server.db"
     database_url = f"sqlite:///{database_path}"
     setup_engine = create_sqlite_engine(database_url)
     create_schema(setup_engine)
     setup_engine.dispose()
-    server = create_server_for_database(database_url)
+    server = create_server_for_database(database_url, environment={})
 
     async def scenario() -> None:
         async with Client(server, raise_exceptions=True) as client:

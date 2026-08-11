@@ -21,8 +21,10 @@ from personal_shopping_agent.application import (
     CriterionEvidenceAssessment,
     OfferCostAssessment,
     RenderedShoppingReport,
+    ShoppingReportNotFoundError,
     ShoppingReportService,
     ShoppingWorkflowService,
+    StoredShoppingReportIntegrityError,
     WorkflowSnapshot,
     WorkflowState,
 )
@@ -41,6 +43,7 @@ from personal_shopping_agent.domain import (
     StoreType,
 )
 from personal_shopping_agent.storage import (
+    SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
     SQLiteShoppingRepository,
     SQLiteWorkflowRepository,
@@ -242,6 +245,15 @@ def test_report_uses_one_connection_and_commits_content_and_state() -> None:
     assert stored == result.rendered
     assert record.content == stored.content
     assert record.content_sha256 == stored.content_sha256
+
+    reader = SQLiteShoppingReportRepository(factory)
+    assert reader.get(scored.workflow.id) == result.rendered
+    with session_scope(factory) as session:
+        persisted = session.scalar(select(ShoppingReportRecord))
+        assert persisted is not None
+        persisted.content = f"{persisted.content}\ntampered"
+    with pytest.raises(StoredShoppingReportIntegrityError, match="indexes must match"):
+        reader.get(scored.workflow.id)
     engine.dispose()
 
 
@@ -287,5 +299,8 @@ def test_report_unit_of_work_requires_context_and_rolls_back_without_commit() ->
         unit.commit()
     with unit:
         pass
+
+    with pytest.raises(ShoppingReportNotFoundError, match="was not found"):
+        SQLiteShoppingReportRepository(create_session_factory(engine)).get(uuid4())
 
     engine.dispose()

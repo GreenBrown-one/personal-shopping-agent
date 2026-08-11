@@ -124,6 +124,12 @@ from personal_shopping_agent.application.ranking import (
     DuplicateCandidateError,
     NoCandidatesForScoringError,
 )
+from personal_shopping_agent.application.report_access import (
+    ShoppingReportAccessService,
+    ShoppingReportNotFoundError,
+    ShoppingReportReader,
+    StoredShoppingReportIntegrityError,
+)
 from personal_shopping_agent.application.reporting import (
     MarkdownShoppingReportRenderer,
     NoCandidateScoresForReportError,
@@ -246,11 +252,14 @@ __all__ = [
     "SearchDetailUnitOfWorkFactory",
     "SearchObservation",
     "ShoppingDecisionReport",
+    "ShoppingReportAccessService",
     "ShoppingReportBuilder",
     "ShoppingReportExplanation",
     "ShoppingReportExplanationResult",
     "ShoppingReportExplanationService",
+    "ShoppingReportNotFoundError",
     "ShoppingReportPresentationService",
+    "ShoppingReportReader",
     "ShoppingReportResult",
     "ShoppingReportService",
     "ShoppingReportUnitOfWork",
@@ -263,6 +272,7 @@ __all__ = [
     "SpecificationNormalizationStatus",
     "SpecificationNormalizationUnitOfWork",
     "SpecificationNormalizationUnitOfWorkFactory",
+    "StoredShoppingReportIntegrityError",
     "WorkflowEvent",
     "WorkflowSnapshot",
     "WorkflowState",

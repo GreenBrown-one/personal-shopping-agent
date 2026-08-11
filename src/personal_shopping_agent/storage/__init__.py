@@ -22,6 +22,9 @@ from personal_shopping_agent.storage.observation_repository import (
     ObservationKindMismatchError,
     SQLitePlatformObservationRepository,
 )
+from personal_shopping_agent.storage.reporting_repository import (
+    SQLiteShoppingReportRepository,
+)
 from personal_shopping_agent.storage.reporting_unit_of_work import (
     SQLiteShoppingReportUnitOfWork,
 )
@@ -50,6 +53,7 @@ __all__ = [
     "SQLiteOfferIngestionUnitOfWork",
     "SQLitePlatformObservationRepository",
     "SQLiteSearchDetailUnitOfWork",
+    "SQLiteShoppingReportRepository",
     "SQLiteShoppingReportUnitOfWork",
     "SQLiteShoppingRepository",
     "SQLiteSpecificationNormalizationUnitOfWork",
