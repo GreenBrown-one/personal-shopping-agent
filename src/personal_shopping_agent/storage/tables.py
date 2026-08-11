@@ -88,6 +88,36 @@ class EvidenceRecord(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
+class PlatformObservationRecord(Base):
+    """Structured parser output linked to its originating shopping request."""
+
+    __tablename__ = "platform_observations"
+    __table_args__ = (
+        Index(
+            "ix_platform_observations_request_kind_captured",
+            "request_id",
+            "kind",
+            "captured_at",
+        ),
+        Index(
+            "ix_platform_observations_platform_external_captured",
+            "platform",
+            "external_id",
+            "captured_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    request_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_requests.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    platform: Mapped[str] = mapped_column(String(40), nullable=False)
+    external_id: Mapped[str | None] = mapped_column(String(120))
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
 class WorkflowRecord(Base):
     """Current orchestration state linked to one validated shopping request."""
 
