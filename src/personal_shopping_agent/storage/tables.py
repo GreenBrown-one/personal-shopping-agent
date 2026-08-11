@@ -121,6 +121,41 @@ class EvidenceCheckRecord(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
+class NormalizedSpecificationRecord(Base):
+    """Append-only normalized values with raw evidence retained in the payload."""
+
+    __tablename__ = "normalized_specifications"
+    __table_args__ = (
+        Index(
+            "ix_normalized_specifications_request_product_key",
+            "request_id",
+            "product_id",
+            "canonical_key",
+        ),
+        Index(
+            "ix_normalized_specifications_workflow_status",
+            "workflow_id",
+            "status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    request_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_requests.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    canonical_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    status: Mapped[str] = mapped_column(String(64), nullable=False)
+    canonical_unit: Mapped[str | None] = mapped_column(String(40))
+    normalized_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
 class PlatformObservationRecord(Base):
     """Structured parser output linked to its originating shopping request."""
 
