@@ -33,6 +33,8 @@ uv run playwright install chromium
 uv run python -m personal_shopping_agent
 uv run personal-shopping-agent migrate
 uv run personal-shopping-agent doctor
+uv run personal-shopping-agent data export <WORKFLOW_UUID> --output workflow-export.json
+uv run personal-shopping-agent data delete <WORKFLOW_UUID>
 uv run personal-shopping-agent-mcp
 uv run pytest
 uv run ruff check .
@@ -53,6 +55,21 @@ uv run python scripts/verify_wheel.py dist
 默认读取 `PERSONAL_SHOPPING_DATABASE_URL`，未设置时使用
 `sqlite:///data/personal-shopping-agent.db`，也可显式传入 `--database-url`。MCP 入口发现数据库缺失或
 版本落后时会拒绝启动并提示先迁移，不会在工具调用期间临时改表。
+
+结构化购物任务默认长期保存在本地。`data export` 会把一个 Workflow 的已验证请求、事件、观察、证据、
+评分和报告写入新的 JSON 文件，并以仅当前用户可读写的权限创建；它拒绝覆盖已有文件，命令输出只显示
+记录数量、文件字节数和 SHA-256。导出可能包含购物需求、地区、卖家和来源 URL，请私密保管。
+
+`data delete <WORKFLOW_UUID>` 默认仅预览，不删除数据，并返回绑定当前记录清单的
+`confirmation_token`。确认无误后，使用同一数据库立即执行：
+
+```bash
+uv run personal-shopping-agent data delete <WORKFLOW_UUID> --confirm <CONFIRMATION_TOKEN>
+```
+
+执行前会在事务内重新核对清单；数据发生变化时旧 token 自动失效。系统只删除该请求聚合，并只回收
+没有其他任务引用的 Product/Offer；保留的共享记录会在预览中计数。没有清空全部数据命令，也没有 MCP
+删除工具。原始页面和截图缓存仍然关闭。
 
 ## 可选 LLM 解释器
 
@@ -186,6 +203,11 @@ Python 包、健康检查与 MCP 服务器共同读取该值，避免分别维�
 与源码环境隔离的全新虚拟环境，安装 wheel 及其依赖，实际执行健康检查、迁移前的拒绝检查、迁移、
 迁移后的就绪检查，并从安装位置组合默认 MCP 服务器。验证脚本接收 `dist` 目录并自动定位唯一 wheel，
 因此发布版本变化时无需改写 CI 文件名。
+
+M6 的第四个切片增加本地数据生命周期。用户可以把单个 Workflow 导出为带版本与完整性哈希的私密 JSON；
+删除默认只返回记录级预览，必须复制与 Workflow、revision 和清单指纹绑定的 token 才会执行。执行时再次
+加锁核对并原子删除请求、工作流、观察、证据、评分和报告；Product/Offer 只有在确认无其他本地任务引用
+时才回收。该能力仅属于本地 CLI，不赋予 MCP 模型删除数据的权限。
 
 淘宝/天猫和拼多多只作为未来适配器候选保留，不在 v1.0 同时接入。当前顺序是先把京东搜索、详情、地区价格、库存语境和证据链做完整，再评估第二个平台，避免在多套不稳定页面结构上过早摊薄测试与维护投入。
 

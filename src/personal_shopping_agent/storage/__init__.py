@@ -1,11 +1,13 @@
 """Public local-storage adapter API."""
 
+from personal_shopping_agent.storage.archive import LocalJsonWorkflowArchiveWriter
 from personal_shopping_agent.storage.collection_unit_of_work import (
     SQLiteSearchDetailUnitOfWork,
 )
 from personal_shopping_agent.storage.cross_check_unit_of_work import (
     SQLiteEvidenceCrossCheckUnitOfWork,
 )
+from personal_shopping_agent.storage.data_lifecycle import SQLiteWorkflowDataStore
 from personal_shopping_agent.storage.database import (
     create_schema,
     create_session_factory,
@@ -60,6 +62,7 @@ __all__ = [
     "DuplicateEntityError",
     "EntityNotFoundError",
     "InvalidReferenceError",
+    "LocalJsonWorkflowArchiveWriter",
     "ObservationKindMismatchError",
     "SQLiteCandidateScoringUnitOfWork",
     "SQLiteEvidenceCrossCheckUnitOfWork",
@@ -70,6 +73,7 @@ __all__ = [
     "SQLiteShoppingReportUnitOfWork",
     "SQLiteShoppingRepository",
     "SQLiteSpecificationNormalizationUnitOfWork",
+    "SQLiteWorkflowDataStore",
     "SQLiteWorkflowRepository",
     "create_migration_config",
     "create_schema",
