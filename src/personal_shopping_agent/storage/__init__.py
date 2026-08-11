@@ -22,6 +22,9 @@ from personal_shopping_agent.storage.observation_repository import (
     ObservationKindMismatchError,
     SQLitePlatformObservationRepository,
 )
+from personal_shopping_agent.storage.reporting_unit_of_work import (
+    SQLiteShoppingReportUnitOfWork,
+)
 from personal_shopping_agent.storage.repository import (
     DuplicateEntityError,
     EntityNotFoundError,
@@ -47,6 +50,7 @@ __all__ = [
     "SQLiteOfferIngestionUnitOfWork",
     "SQLitePlatformObservationRepository",
     "SQLiteSearchDetailUnitOfWork",
+    "SQLiteShoppingReportUnitOfWork",
     "SQLiteShoppingRepository",
     "SQLiteSpecificationNormalizationUnitOfWork",
     "SQLiteWorkflowRepository",

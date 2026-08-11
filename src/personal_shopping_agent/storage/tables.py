@@ -208,6 +208,33 @@ class CandidateScoreRecord(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
+class ShoppingReportRecord(Base):
+    """Integrity-checked deterministic report for one scored workflow."""
+
+    __tablename__ = "shopping_reports"
+    __table_args__ = (
+        UniqueConstraint("workflow_id", name="uq_shopping_reports_workflow_id"),
+        Index(
+            "ix_shopping_reports_request_rendered",
+            "request_id",
+            "rendered_at",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    request_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_requests.id", ondelete="CASCADE"), nullable=False
+    )
+    workflow_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("shopping_workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    format: Mapped[str] = mapped_column(String(32), nullable=False)
+    rendered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
 class PlatformObservationRecord(Base):
     """Structured parser output linked to its originating shopping request."""
 
