@@ -33,6 +33,10 @@ class BrowserNotStartedError(BrowserManagerError):
     """Raised when navigation is attempted outside the managed lifecycle."""
 
 
+class TransientBrowserManagerError(BrowserManagerError):
+    """Sanitized navigation failure that a bounded coordinator may retry."""
+
+
 class BrowserSnapshot(BaseModel):
     """Bounded page data returned to a platform parser."""
 
@@ -168,15 +172,18 @@ class BrowserManager:
             except PlaywrightError as error:
                 if self._last_violation is not None:
                     raise self._last_violation from None
-                raise BrowserManagerError("The destination page could not be opened.") from error
+                raise TransientBrowserManagerError(
+                    "The destination page could not be opened."
+                ) from error
 
             await self._policy.validate(page.url)
             html = await page.content()
             if len(html.encode("utf-8")) > self._settings.maximum_html_bytes:
                 raise BrowserManagerError("The destination page exceeded the safe HTML size limit.")
 
+            status_code = response.status if response is not None else 0
             screenshot_path: str | None = None
-            if screenshot:
+            if screenshot and 200 <= status_code < 400:
                 self._settings.screenshot_directory.mkdir(parents=True, exist_ok=True)
                 path = self._settings.screenshot_directory / f"page-{uuid4().hex}.png"
                 await page.screenshot(path=str(path), full_page=True)
@@ -186,7 +193,7 @@ class BrowserManager:
                 {
                     "requested_url": url,
                     "final_url": page.url,
-                    "status_code": response.status if response is not None else 0,
+                    "status_code": status_code,
                     "title": (await page.title())[:500],
                     "html": html,
                     "captured_at": self._clock(),
