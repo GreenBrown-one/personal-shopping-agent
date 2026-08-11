@@ -1,5 +1,13 @@
 """Application use cases and deterministic orchestration contracts."""
 
+from personal_shopping_agent.application.details import (
+    PlatformDetailAdapter,
+    PlatformDetailParseError,
+    PlatformProductDetail,
+    PlatformSpecificationObservation,
+    PlatformVariantOption,
+    ProductDetailService,
+)
 from personal_shopping_agent.application.discovery import (
     CandidateDiscoveryService,
     CollectedPage,
@@ -29,8 +37,14 @@ __all__ = [
     "PageCollector",
     "PlatformAccessRestrictedError",
     "PlatformCandidate",
+    "PlatformDetailAdapter",
+    "PlatformDetailParseError",
+    "PlatformProductDetail",
     "PlatformSearchAdapter",
     "PlatformSearchResult",
+    "PlatformSpecificationObservation",
+    "PlatformVariantOption",
+    "ProductDetailService",
     "ShoppingWorkflow",
     "ShoppingWorkflowService",
     "WorkflowEvent",
