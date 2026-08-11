@@ -188,3 +188,16 @@ def test_local_archive_writer_sanitizes_failures_and_removes_partial_file(
     with pytest.raises(ArchiveWriteError, match="could not be written"):
         writer.write(archive, output_path)
     assert not output_path.exists()
+
+
+def test_local_archive_writer_supports_hosts_without_descriptor_chmod(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    archive = WorkflowDataArchive(exported_at=NOW, data=build_data())
+    output_path = tmp_path / "portable.json"
+    monkeypatch.delattr(os, "fchmod", raising=False)
+
+    receipt = LocalJsonWorkflowArchiveWriter().write(archive, output_path)
+
+    assert receipt.bytes_written == len(output_path.read_bytes())

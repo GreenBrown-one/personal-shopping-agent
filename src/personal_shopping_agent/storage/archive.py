@@ -39,6 +39,9 @@ class LocalJsonWorkflowArchiveWriter:
                 0o600,
             )
             created = True
+            descriptor_chmod = getattr(os, "fchmod", None)
+            if descriptor_chmod is not None:
+                descriptor_chmod(descriptor, 0o600)
             with os.fdopen(descriptor, "wb") as destination:
                 destination.write(payload)
                 destination.flush()

@@ -170,6 +170,9 @@ def _require_database_state(
         raise SystemExit(f"{label} returned an unexpected database state: {database!r}")
     if ready and database.get("current_revision") != database.get("target_revision"):
         raise SystemExit(f"{label} did not reach the packaged migration head")
+    expected_permissions = True if exists and os.name == "posix" else None
+    if database.get("private_file_permissions") is not expected_permissions:
+        raise SystemExit(f"{label} returned an unexpected private-file permission state")
 
 
 def _verify_clean_install(wheel: Path, wheel_version: str) -> None:

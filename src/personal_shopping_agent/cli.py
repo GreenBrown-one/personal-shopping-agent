@@ -78,6 +78,7 @@ def _status_payload(status: DatabaseMigrationStatus) -> dict[str, object]:
         "database_exists": status.database_exists,
         "current_revision": status.current_revision,
         "target_revision": status.target_revision,
+        "private_file_permissions": status.private_file_permissions,
         "ready": status.ready,
     }
 

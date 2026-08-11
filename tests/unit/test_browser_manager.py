@@ -1,6 +1,7 @@
 """Unit tests for the controlled Playwright lifecycle without live network access."""
 
 import asyncio
+import stat
 from collections.abc import Awaitable, Callable, Coroutine
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,6 +19,7 @@ from personal_shopping_agent.browser import (
     NavigationPolicyError,
 )
 from personal_shopping_agent.browser.manager import PlaywrightFactory
+from personal_shopping_agent.local_security import LocalFileSecurityError
 
 CAPTURED_AT = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 
@@ -59,6 +61,7 @@ class FakePage:
         self.page_title = "Fixture title"
         self.response: FakeResponse | None = FakeResponse(200)
         self.goto_error: PlaywrightError | None = None
+        self.screenshot_error: PlaywrightError | None = None
         self.goto_hook: Callable[[], Awaitable[None]] | None = None
         self.goto_calls: list[tuple[str, str, int]] = []
         self.screenshot_calls: list[tuple[str, bool]] = []
@@ -79,6 +82,9 @@ class FakePage:
 
     async def screenshot(self, *, path: str, full_page: bool) -> None:
         self.screenshot_calls.append((path, full_page))
+        Path(path).write_bytes(b"fake png")
+        if self.screenshot_error is not None:
+            raise self.screenshot_error
 
 
 class FakeContext:
@@ -213,6 +219,7 @@ def test_context_manager_starts_and_closes_existing_page(tmp_path: Path) -> None
         "headless": False,
         "accept_downloads": False,
     }
+    assert stat.S_IMODE((tmp_path / "profile").stat().st_mode) == 0o700
     assert context.closed
     assert playwright.stopped
     run(manager.close())
@@ -264,6 +271,74 @@ def test_open_returns_bounded_snapshot_and_optional_screenshot(tmp_path: Path) -
     screenshot_path, full_page = page.screenshot_calls[0]
     assert screenshot_path.startswith(str(tmp_path / "screenshots"))
     assert full_page
+    assert stat.S_IMODE((tmp_path / "screenshots").stat().st_mode) == 0o700
+    assert stat.S_IMODE(Path(screenshot_path).stat().st_mode) == 0o600
+
+
+def test_start_rejects_an_insecure_existing_profile(tmp_path: Path) -> None:
+    profile = tmp_path / "profile"
+    profile.mkdir(mode=0o755)
+    profile.chmod(0o755)
+    manager, _page, context, _chromium, playwright = make_manager(tmp_path)
+
+    with pytest.raises(BrowserManagerError, match="profile directory is not private"):
+        run(manager.start())
+
+    assert context.route_pattern is None
+    assert playwright.stopped is False
+
+
+def test_screenshot_failures_are_sanitized_and_remove_partial_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, page, _context, _chromium, _playwright = make_manager(tmp_path)
+    page.screenshot_error = PlaywrightError("raw screenshot detail")
+
+    async def playwright_failure() -> None:
+        await manager.start()
+        with pytest.raises(BrowserManagerError) as captured:
+            await manager.open("https://shop.example/products", screenshot=True)
+        assert "raw screenshot detail" not in str(captured.value)
+        await manager.close()
+
+    run(playwright_failure())
+    assert not tuple((tmp_path / "screenshots").glob("*.png"))
+
+    second, _page, _context, _chromium, _playwright = make_manager(tmp_path / "second")
+
+    def fail_security(_: Path) -> None:
+        raise LocalFileSecurityError("raw local path detail")
+
+    monkeypatch.setattr(
+        "personal_shopping_agent.browser.manager.secure_existing_private_file",
+        fail_security,
+    )
+
+    async def private_storage_failure() -> None:
+        await second.start()
+        with pytest.raises(BrowserManagerError) as captured:
+            await second.open("https://shop.example/products", screenshot=True)
+        assert "raw local path detail" not in str(captured.value)
+        await second.close()
+
+    run(private_storage_failure())
+    assert not tuple((tmp_path / "second" / "screenshots").glob("*.png"))
+
+
+def test_screenshot_rejects_an_insecure_existing_directory(tmp_path: Path) -> None:
+    manager, _page, _context, _chromium, _playwright = make_manager(tmp_path)
+    screenshots = tmp_path / "screenshots"
+    screenshots.mkdir(mode=0o755)
+    screenshots.chmod(0o755)
+
+    async def scenario() -> None:
+        await manager.start()
+        with pytest.raises(BrowserManagerError, match="screenshot directory is not private"):
+            await manager.open("https://shop.example/products", screenshot=True)
+        await manager.close()
+
+    run(scenario())
 
 
 def test_open_allows_missing_navigation_response_without_screenshot(tmp_path: Path) -> None:

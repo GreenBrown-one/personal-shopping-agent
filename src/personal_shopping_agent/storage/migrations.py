@@ -10,6 +10,11 @@ from alembic.script import ScriptDirectory
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
+from personal_shopping_agent.local_security import (
+    LocalFileSecurityError,
+    inspect_private_file,
+    prepare_private_file,
+)
 from personal_shopping_agent.storage.database import create_sqlite_engine
 
 
@@ -29,6 +34,7 @@ class DatabaseMigrationStatus:
     current_revision: str | None
     target_revision: str
     ready: bool
+    private_file_permissions: bool | None = None
 
 
 def migration_script_location() -> Path:
@@ -60,18 +66,28 @@ def inspect_database_migrations(database_url: str) -> DatabaseMigrationStatus:
     """Read schema revision without creating a missing file-backed database."""
 
     database_path = _database_file_path(database_url)
-    database_exists = database_path is None or database_path.is_file()
     try:
         config = create_migration_config(database_url)
         target_revision = ScriptDirectory.from_config(config).get_current_head()
         if target_revision is None:
             raise DatabaseMigrationError("The migration history has no target revision.")
+        file_status = inspect_private_file(database_path) if database_path is not None else None
+        database_exists = file_status is None or file_status.exists
         if not database_exists:
             return DatabaseMigrationStatus(
                 database_exists=False,
                 current_revision=None,
                 target_revision=target_revision,
                 ready=False,
+                private_file_permissions=None,
+            )
+        if file_status is not None and file_status.private_permissions is False:
+            return DatabaseMigrationStatus(
+                database_exists=True,
+                current_revision=None,
+                target_revision=target_revision,
+                ready=False,
+                private_file_permissions=False,
             )
 
         engine = create_sqlite_engine(database_url)
@@ -90,6 +106,9 @@ def inspect_database_migrations(database_url: str) -> DatabaseMigrationStatus:
         current_revision=current_revision,
         target_revision=target_revision,
         ready=current_revision == target_revision,
+        private_file_permissions=(
+            file_status.private_permissions if file_status is not None else None
+        ),
     )
 
 
@@ -97,10 +116,14 @@ def upgrade_database(database_url: str) -> DatabaseMigrationStatus:
     """Apply forward-only Alembic migrations and return the verified current status."""
 
     database_path = _database_file_path(database_url)
-    if database_path is not None:
-        database_path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        if database_path is not None:
+            prepare_private_file(database_path)
         command.upgrade(create_migration_config(database_url), "head")
+        if database_path is not None:
+            prepare_private_file(database_path)
+    except LocalFileSecurityError as error:
+        raise DatabaseMigrationError("Database private file could not be secured.") from error
     except Exception as error:
         raise DatabaseMigrationError("Database migration could not be completed.") from error
 
