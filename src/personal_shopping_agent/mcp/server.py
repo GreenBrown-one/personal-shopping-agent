@@ -7,6 +7,7 @@ from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
 from sqlalchemy.orm import Session, sessionmaker
 
+from personal_shopping_agent.__about__ import __version__
 from personal_shopping_agent.application import (
     OfficialEvidenceProvider,
     PageCollector,
@@ -82,7 +83,7 @@ def create_mcp_server(
     server = MCPServer(
         name="personal-shopping-agent",
         title="Personal Shopping Agent",
-        version="0.1.0",
+        version=__version__,
         description="Evidence-driven personal shopping workflow service.",
         instructions=(
             "Create and inspect local shopping workflows. Deterministic reports can be rendered "

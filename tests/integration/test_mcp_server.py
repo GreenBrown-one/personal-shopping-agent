@@ -11,6 +11,7 @@ from mcp.server import MCPServer
 from pydantic import HttpUrl
 from sqlalchemy import Engine
 
+from personal_shopping_agent import __version__
 from personal_shopping_agent.application import (
     CandidateDecisionInput,
     CandidateEvidenceConfidence,
@@ -231,6 +232,7 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
     engine = create_sqlite_engine("sqlite://")
     create_schema(engine)
     server = create_test_server(engine)
+    assert server.version == __version__
 
     async def scenario() -> None:
         async with Client(server, raise_exceptions=True) as client:

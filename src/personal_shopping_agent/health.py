@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from personal_shopping_agent.__about__ import __version__
+
 SERVICE_NAME = "personal-shopping-agent"
-SERVICE_VERSION = "0.1.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,4 +20,4 @@ class HealthStatus:
 def health_check() -> HealthStatus:
     """Return a deterministic process-level health result."""
 
-    return HealthStatus(service=SERVICE_NAME, status="ok", version=SERVICE_VERSION)
+    return HealthStatus(service=SERVICE_NAME, status="ok", version=__version__)

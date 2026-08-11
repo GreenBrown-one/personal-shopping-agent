@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "personal-shopping-agent"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Evidence-driven, local-first personal shopping decision agent."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -32,6 +32,9 @@ dev = [
   "pytest-cov>=6,<7",
   "ruff>=0.11,<1",
 ]
+
+[tool.hatch.version]
+path = "src/personal_shopping_agent/__about__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/personal_shopping_agent"]
