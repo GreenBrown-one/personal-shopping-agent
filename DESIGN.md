@@ -348,6 +348,25 @@ OpenAI 兼容 Chat Completions JSON Output，再执行同一 Pydantic 与应用�
 SDK；DeepSeek 依据其公开的 OpenAI 兼容接口复用同一客户端并固定官方 Base URL。该 SDK 仅存在于外层
 LLM 适配器，Application 与 Domain 不得导入它。
 
+M5 第三个切片增加运行时选择与用户可见展示，但不把提供方配置放入 Application。安全默认值为
+`PERSONAL_SHOPPING_LLM_PROVIDER=disabled`；只有明确选择 `openai` 或 `deepseek` 后，外层配置模块才
+分别读取 `OPENAI_API_KEY` / `PERSONAL_SHOPPING_OPENAI_MODEL` 或 `DEEPSEEK_API_KEY` /
+`PERSONAL_SHOPPING_DEEPSEEK_MODEL`。未选中提供方的环境变量不得读取进设置对象。模型名不设代码默认值；
+超时、最大输出 token 和候选数分别限制在 `(0,120]`、`[256,4096]` 和 `[1,10]`。未知提供方、缺少
+密钥/模型或数值越界必须在创建 SDK 客户端前失败，并只暴露稳定的脱敏错误码。
+
+运行时设置中的密钥使用 `SecretStr`，从 `repr` 和 `model_dump` 中排除，只在构造已选适配器时短暂取值。
+组合工厂创建 `ShoppingReportExplanationService` 与 `ShoppingReportPresentationService`，Application
+继续只依赖模型无关端口。该工厂不代表 MCP 已启用真实模型；在报告读取/展示用例注册为 MCP 工具并
+完成人工配置前，不得把内部适配器能力报告为可直接使用的 MCP 能力。
+
+成功解释的展示必须先包含原确定性 Markdown 的完整字节，随后以分隔线追加明确标注为“AI 辅助解释”
+的章节。模型文本、提供方、模型名、Product 名、事实标签和值再次经过统一 Markdown 转义；候选标题
+来自确定性报告而不是模型。每段后展示已经过范围校验的事实 ID 及其精确值，整个组合内容重新计算
+SHA-256。`RenderedShoppingReportPresentation` 必须校验基础报告前缀与新哈希。关闭、未配置、提供方
+不可用或输出无效时，不追加任何标题、错误文本或模型信息，展示内容和哈希必须与原确定性报告完全
+相同。解释展示仍不持久化、不推进工作流，也不能反向成为 Evidence 或 CandidateScore。
+
 ## 6. 确定性工作流
 
 首版使用显式状态机，不使用通用 Agent 图框架：

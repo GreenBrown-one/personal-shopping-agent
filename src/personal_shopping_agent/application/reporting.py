@@ -284,7 +284,9 @@ class ShoppingReportBuilder:
 _MARKDOWN_SPECIAL = re.compile(r"([\\`*_{}\[\]<>()#+\-.!|])")
 
 
-def _escape_markdown(value: object) -> str:
+def escape_markdown(value: object) -> str:
+    """Normalize and escape untrusted text before inserting it into Markdown."""
+
     normalized = " ".join(str(value).split())
     return _MARKDOWN_SPECIAL.sub(r"\\\1", normalized)
 
@@ -294,7 +296,7 @@ def _decimal(value: Decimal, places: int) -> str:
 
 
 def _money(value: Money) -> str:
-    return f"{_escape_markdown(value.currency)} {_escape_markdown(format(value.amount, 'f'))}"
+    return f"{escape_markdown(value.currency)} {escape_markdown(format(value.amount, 'f'))}"
 
 
 _BUDGET_LABELS = {
@@ -333,20 +335,20 @@ class MarkdownShoppingReportRenderer:
             "",
             f"- 工作流：`{report.workflow_id}`",
             f"- 生成时间：`{report.generated_at.isoformat()}`",
-            f"- 评分方法：`{_escape_markdown(report.methodology_version)}`",
+            f"- 评分方法：`{escape_markdown(report.methodology_version)}`",
             "",
-            f"> {_escape_markdown(report.disclaimer)}",
+            f"> {escape_markdown(report.disclaimer)}",
             "",
             "## 需求摘要",
             "",
-            f"- 商品需求：{_escape_markdown(report.request.query)}",
+            f"- 商品需求：{escape_markdown(report.request.query)}",
         ]
         lines.extend(
             (
-                f"- 类别：{_escape_markdown(report.request.category)}",
+                f"- 类别：{escape_markdown(report.request.category)}",
                 f"- 正常预算：{_money(report.request.budget.maximum)}",
                 f"- 弹性预算：{self._stretch_budget(report.request)}",
-                f"- 地区：{_escape_markdown(report.request.region or '未指定')}",
+                f"- 地区：{escape_markdown(report.request.region or '未指定')}",
                 "",
                 "## 当前结论",
                 "",
@@ -356,7 +358,7 @@ class MarkdownShoppingReportRenderer:
             top = eligible[0]
             lines.extend(
                 (
-                    f"当前排序第一候选为 **{_escape_markdown(top.product.canonical_name)}**。",
+                    f"当前排序第一候选为 **{escape_markdown(top.product.canonical_name)}**。",
                     "该结论来自下述确定性规则，不代表自动购买指令。",
                 )
             )
@@ -383,9 +385,9 @@ class MarkdownShoppingReportRenderer:
         lines.extend(("## 未进入排名", ""))
         if excluded:
             lines.extend(
-                f"- **{_escape_markdown(item.product.canonical_name)}**："
+                f"- **{escape_markdown(item.product.canonical_name)}**："
                 + "；".join(
-                    _escape_markdown(_EXCLUSION_LABELS.get(code, code))
+                    escape_markdown(_EXCLUSION_LABELS.get(code, code))
                     for code in item.score.exclusion_codes
                 )
                 for item in excluded
@@ -431,7 +433,7 @@ class MarkdownShoppingReportRenderer:
         assert score.value_per_100 is not None
         assert score.pareto_front is not None
         return (
-            f"| {score.rank} | {_escape_markdown(candidate.product.canonical_name)} | "
+            f"| {score.rank} | {escape_markdown(candidate.product.canonical_name)} | "
             f"{_BUDGET_LABELS[score.budget_status.value]} | {_money(score.selected_price)} | "
             f"{_money(score.effective_cost)} | {_decimal(score.final_score, 6)} | "
             f"{_decimal(score.value_per_100, 6)} | "
@@ -446,10 +448,10 @@ class MarkdownShoppingReportRenderer:
         assert score.risk_penalty is not None
         lines.extend(
             (
-                f"### {score.rank}. {_escape_markdown(candidate.product.canonical_name)}",
+                f"### {score.rank}. {escape_markdown(candidate.product.canonical_name)}",
                 "",
-                f"- 品牌 / 型号：{_escape_markdown(candidate.product.brand)} / "
-                f"{_escape_markdown(candidate.product.model)}",
+                f"- 品牌 / 型号：{escape_markdown(candidate.product.brand)} / "
+                f"{escape_markdown(candidate.product.model)}",
                 f"- 风险惩罚：{_decimal(score.risk_penalty, 6)}",
                 f"- 调整后效用：{_decimal(score.confidence.adjusted_utility or Decimal('0'), 6)}",
             )
@@ -458,8 +460,7 @@ class MarkdownShoppingReportRenderer:
             offer = candidate.offer
             lines.extend(
                 (
-                    f"- 报价：{_escape_markdown(offer.platform)} / "
-                    f"{_escape_markdown(offer.seller)}",
+                    f"- 报价：{escape_markdown(offer.platform)} / {escape_markdown(offer.seller)}",
                     f"- 报价采集时间：`{offer.captured_at.isoformat()}`",
                     f"- 商品页面：<{offer.url}>",
                 )
@@ -477,7 +478,7 @@ class MarkdownShoppingReportRenderer:
             strict=True,
         ):
             lines.append(
-                f"| {_escape_markdown(evaluation.key)} | "
+                f"| {escape_markdown(evaluation.key)} | "
                 f"{_STATUS_LABELS[evaluation.status.value]} | "
                 f"{_decimal(evaluation.score, 6)} | {_decimal(confidence.confidence, 6)} | "
                 f"{'是' if evaluation.hard_requirement else '否'} |"
@@ -485,8 +486,8 @@ class MarkdownShoppingReportRenderer:
         lines.extend(("", "证据来源：", ""))
         if candidate.evidence:
             lines.extend(
-                f"- {_escape_markdown(item.source_title)}（"
-                f"{_escape_markdown(item.source_type.value)}，`{item.captured_at.isoformat()}`）："
+                f"- {escape_markdown(item.source_title)}（"
+                f"{escape_markdown(item.source_type.value)}，`{item.captured_at.isoformat()}`）："
                 f"<{item.source_url}>"
                 for item in candidate.evidence
             )

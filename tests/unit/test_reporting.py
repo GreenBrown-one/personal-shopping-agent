@@ -1,5 +1,7 @@
 """Unit tests for provider-neutral deterministic shopping reports."""
 
+# ruff: noqa: RUF001 -- Chinese fixture copy intentionally uses full-width punctuation.
+
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -29,10 +31,12 @@ from personal_shopping_agent.application import (
     ExplanationStatus,
     InvalidExplanationOutputError,
     InvalidWorkflowTransitionError,
+    MarkdownShoppingReportExplanationRenderer,
     MarkdownShoppingReportRenderer,
     NoCandidateScoresForReportError,
     OfferCostAssessment,
     RenderedShoppingReport,
+    RenderedShoppingReportPresentation,
     ReportCandidate,
     ReportExplanationProviderError,
     ReportExplanationRequest,
@@ -44,6 +48,7 @@ from personal_shopping_agent.application import (
     ShoppingReportExplanation,
     ShoppingReportExplanationResult,
     ShoppingReportExplanationService,
+    ShoppingReportPresentationService,
     ShoppingReportService,
     ShoppingWorkflow,
     WorkflowEvent,
@@ -875,3 +880,103 @@ def test_explanation_result_and_provider_error_reject_inconsistent_states() -> N
         )
     with pytest.raises(ValueError, match="cannot report"):
         ReportExplanationProviderError(ExplanationFallbackReason.NOT_CONFIGURED)
+
+
+def test_explanation_renderer_appends_escaped_fact_cited_overlay() -> None:
+    fixture = build_fixture()
+    rendered = MarkdownShoppingReportRenderer().render(build_report(fixture))
+    request = ReportExplanationRequestBuilder().build(rendered)
+    explanation = build_explanation(request)
+    explanation = explanation.model_copy(
+        update={
+            "overview": explanation.overview.model_copy(update={"text": "# 不是标题，*不是强调*"})
+        }
+    )
+    result = ShoppingReportExplanationService(FakeExplanationProvider(output=explanation)).explain(
+        rendered
+    )
+
+    presentation = MarkdownShoppingReportExplanationRenderer().render(result)
+
+    assert presentation.content.startswith(f"{rendered.content}\n\n---\n\n")
+    assert "## AI 辅助解释" in presentation.content
+    assert "\\# 不是标题，\\*不是强调\\*" in presentation.content
+    assert "`report.recommendation`" in presentation.content
+    assert "fake\\-model" in presentation.content
+    assert "Example \\[X1\\] \\| phone" in presentation.content
+    assert (
+        presentation.content_sha256
+        == hashlib.sha256(presentation.content.encode("utf-8")).hexdigest()
+    )
+    assert presentation.result.request == request
+
+
+def test_explanation_renderer_keeps_fallback_byte_identical() -> None:
+    rendered = MarkdownShoppingReportRenderer().render(build_report(build_fixture()))
+    result = ShoppingReportExplanationService(None).explain(rendered)
+
+    presentation = MarkdownShoppingReportExplanationRenderer().render(result)
+
+    assert presentation.content == rendered.content
+    assert presentation.content_sha256 == rendered.content_sha256
+    assert "AI 辅助解释" not in presentation.content
+
+
+def test_explanation_result_requires_exact_fact_projection() -> None:
+    rendered = MarkdownShoppingReportRenderer().render(build_report(build_fixture()))
+    valid = ShoppingReportExplanationService(FakeExplanationProvider()).explain(rendered)
+    assert valid.request is not None
+    changed_fact = valid.request.facts[0].model_copy(update={"value": "changed"})
+    changed_request = valid.request.model_copy(
+        update={"facts": (changed_fact, *valid.request.facts[1:])}
+    )
+
+    with pytest.raises(ValidationError, match="exact deterministic projection"):
+        ShoppingReportExplanationResult.model_validate(
+            valid.model_dump() | {"request": changed_request}
+        )
+
+
+def test_rendered_explanation_presentation_rejects_unbound_content() -> None:
+    rendered = MarkdownShoppingReportRenderer().render(build_report(build_fixture()))
+    fallback = MarkdownShoppingReportExplanationRenderer().render(
+        ShoppingReportExplanationService(None).explain(rendered)
+    )
+    with pytest.raises(ValidationError, match="hash must match"):
+        RenderedShoppingReportPresentation.model_validate(
+            fallback.model_dump() | {"content_sha256": "0" * 64}
+        )
+    changed_content = f"{fallback.content}\nchanged"
+    with pytest.raises(ValidationError, match="exactly equal"):
+        RenderedShoppingReportPresentation.model_validate(
+            fallback.model_dump()
+            | {
+                "content": changed_content,
+                "content_sha256": hashlib.sha256(changed_content.encode("utf-8")).hexdigest(),
+            }
+        )
+
+    explained = MarkdownShoppingReportExplanationRenderer().render(
+        ShoppingReportExplanationService(FakeExplanationProvider()).explain(rendered)
+    )
+    replacement = "replacement"
+    with pytest.raises(ValidationError, match="must append"):
+        RenderedShoppingReportPresentation.model_validate(
+            explained.model_dump()
+            | {
+                "content": replacement,
+                "content_sha256": hashlib.sha256(replacement.encode("utf-8")).hexdigest(),
+            }
+        )
+
+
+def test_presentation_service_composes_explanation_and_renderer() -> None:
+    rendered = MarkdownShoppingReportRenderer().render(build_report(build_fixture()))
+    service = ShoppingReportPresentationService(
+        ShoppingReportExplanationService(FakeExplanationProvider())
+    )
+
+    presentation = service.present(rendered)
+
+    assert presentation.result.status is ExplanationStatus.EXPLAINED
+    assert "## AI 辅助解释" in presentation.content
