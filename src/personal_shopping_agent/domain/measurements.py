@@ -93,6 +93,12 @@ MEASUREMENT_DEFINITIONS = (
             "tb": Decimal("1024"),
         },
     ),
+    MeasurementDefinition(
+        canonical_key="chip_performance",
+        aliases=frozenset({"chip performance", "芯片性能"}),
+        canonical_unit="SOCPK",
+        unit_factors={"socpk": Decimal("1")},
+    ),
 )
 
 _DEFINITIONS_BY_ALIAS = {

@@ -142,7 +142,21 @@ Windows 可以使用正斜杠路径，例如 `C:/Users/name/personal-shopping-ag
    描述需求并调用 `review_shopping_request` 直到没有阻断问题 → `start_shopping_workflow` →
    `run_shopping_pipeline`（首次建议 `maximum_candidates=10`、`maximum_details=3`）→ `get_shopping_report`。
 
-访问规则：页面只允许京东搜索与商品主机；页面自身的脚本、图片和价格数据只允许来自 `jd.com`、
+**可选：芯片性能评分。** 京东规格里的芯片型号（如“CPU型号：第三代骁龙8”）可以换算成极客湾 SOCPK
+综合性能分（CPU 70%、GPU 30%，骁龙 865 = 100）参与评分：
+
+```bash
+uv run --locked personal-shopping-agent benchmark refresh   # 读取一次公开排行页，建议每月最多一次
+uv run --locked personal-shopping-agent benchmark show --filter 骁龙8
+```
+
+`refresh` 使用独立的无界面浏览器资料，只读取页面渲染后的表格，结果只保存在本机私有文件
+`data/benchmarks/socpk-allperf.json`，不进入 Git。输出中的 `suggested_criterion` 是“越高越好”的加分项：
+骁龙 865 基准（100 分）得半分，榜单最高分得满分，不排除任何候选。刷新后需要重启 AI 宿主，
+`shopping_agent_status` 中 `chip_benchmark=true` 表示已启用。芯片未收录或名称不能精确对应时，该项按缺失
+处理并在报告中显示，不做猜测。
+
+页面自身的脚本、图片和价格数据只允许来自 `jd.com`、
 `360buyimg.com`、`3.cn`；同一主机两次访问至少间隔 3 秒；交易路径、下载和私网地址始终被阻止。
 遇到以下情况系统会停止而不是绕过：
 
@@ -186,6 +200,8 @@ uv run personal-shopping-agent data export <WORKFLOW_UUID> --output workflow-exp
 uv run personal-shopping-agent data delete <WORKFLOW_UUID>
 uv run personal-shopping-agent improvement-case <WORKFLOW_UUID> --error-code <stable_error_code>
 uv run personal-shopping-agent login jd
+uv run personal-shopping-agent benchmark refresh
+uv run personal-shopping-agent benchmark show --filter <芯片名>
 ```
 
 删除命令第一次只生成预览和确认 token，不会立即删除。完整隐私与权限规则见 [`SECURITY.md`](../SECURITY.md)。

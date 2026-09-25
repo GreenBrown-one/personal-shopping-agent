@@ -24,6 +24,7 @@ from personal_shopping_agent.presentation import (
 from personal_shopping_agent.sourcing import (
     CandidateDiscoveryService,
     EvidenceCrossCheckService,
+    IndependentEvidenceProvider,
     OfferIngestionService,
     OfficialEvidenceProvider,
     OfficialProductObservation,
@@ -41,6 +42,7 @@ from personal_shopping_agent.sourcing.platforms.jd import (
     JD_SIGN_IN_HOST,
     JD_SUBRESOURCE_DOMAINS,
 )
+from personal_shopping_agent.sourcing.platforms.socpk import SOCPK_DOMAIN, SOCPK_HOST
 
 
 def create_jd_collection_policy() -> NavigationPolicy:
@@ -62,6 +64,12 @@ def create_jd_sign_in_policy() -> NavigationPolicy:
     )
 
 
+def create_benchmark_policy() -> NavigationPolicy:
+    """Only the public SOCPK ranking page and its own same-domain resources."""
+
+    return NavigationPolicy((SOCPK_HOST, SOCPK_DOMAIN), subresource_domains=(SOCPK_DOMAIN,))
+
+
 class NoOfficialEvidenceProvider:
     """Explicit offline provider that records official sources as missing, never guessed."""
 
@@ -74,6 +82,8 @@ def create_jd_pipeline_service(
     session_factory: sessionmaker[Session],
     page_collector: PageCollector,
     official_evidence_provider: OfficialEvidenceProvider,
+    *,
+    independent_providers: tuple[IndependentEvidenceProvider, ...] = (),
 ) -> ShoppingDecisionPipelineService:
     """Compose every existing JD, decision, storage, and report use case around explicit ports."""
 
@@ -90,6 +100,7 @@ def create_jd_pipeline_service(
         EvidenceCrossCheckService(
             lambda: SQLiteEvidenceCrossCheckUnitOfWork(session_factory),
             official_evidence_provider,
+            independent_providers=independent_providers,
         ),
         SpecificationNormalizationService(
             lambda: SQLiteSpecificationNormalizationUnitOfWork(session_factory)

@@ -28,6 +28,7 @@ from personal_shopping_agent.sourcing import (
     EvidenceCheck,
     EvidenceCheckStatus,
     EvidenceCrossCheckService,
+    IndependentEvidenceScopeError,
     NoProductsForEvidenceCheckError,
     OfficialEvidenceIdentityMismatchError,
     OfficialProductObservation,
@@ -414,3 +415,84 @@ def test_service_rolls_back_wrong_state_missing_products_and_provider_failure() 
         )
     assert failure_unit.exited and failure_unit.rolled_back
     assert not failure_unit.staged_evidence and not failure_unit.checks
+
+
+class FakeIndependentProvider:
+    def __init__(self, *, source_type: EvidenceSourceType, captured_at: datetime) -> None:
+        self.source_type = source_type
+        self.captured_at = captured_at
+        self.seen: list[tuple[UUID, UUID, int]] = []
+
+    def evidence_for(
+        self,
+        *,
+        request_id: UUID,
+        product: Product,
+        platform_evidence: tuple[Evidence, ...],
+    ) -> tuple[Evidence, ...]:
+        self.seen.append((request_id, product.id, len(platform_evidence)))
+        return (
+            platform_evidence[0].model_copy(
+                update={
+                    "id": uuid4(),
+                    "field_path": "specifications.chip_performance",
+                    "source_type": self.source_type,
+                    "observed_value": "280 SOCPK",
+                    "captured_at": self.captured_at,
+                }
+            ),
+        )
+
+
+def test_independent_evidence_is_staged_in_the_same_transaction() -> None:
+    snapshot = build_snapshot()
+    product = build_product()
+    evidence = (platform_evidence(snapshot.request.id, product.id, "specifications.CPU型号", "x"),)
+    unit = FakeCrossCheckUnitOfWork(snapshot, (product,), evidence)
+    independent = FakeIndependentProvider(
+        source_type=EvidenceSourceType.INDEPENDENT_REVIEW, captured_at=NOW
+    )
+    service = EvidenceCrossCheckService(
+        lambda: unit,
+        FakeProvider(()),
+        independent_providers=(independent,),
+        clock=lambda: NOW,
+    )
+
+    result = asyncio.run(service.cross_check(snapshot.workflow.id))
+
+    assert independent.seen == [(snapshot.request.id, product.id, 1)]
+    assert len(result.batch.independent_evidence) == 1
+    assert unit.staged_evidence == [
+        *result.batch.official_evidence,
+        *result.batch.independent_evidence,
+    ]
+    assert unit.committed
+
+
+@pytest.mark.parametrize(
+    ("source_type", "captured_at"),
+    [
+        (EvidenceSourceType.MANUFACTURER_OFFICIAL, NOW),
+        (EvidenceSourceType.INDEPENDENT_REVIEW, datetime(2026, 8, 10, tzinfo=UTC)),
+    ],
+)
+def test_out_of_scope_independent_evidence_rolls_back_everything(
+    source_type: EvidenceSourceType, captured_at: datetime
+) -> None:
+    snapshot = build_snapshot()
+    product = build_product()
+    evidence = (platform_evidence(snapshot.request.id, product.id, "specifications.CPU型号", "x"),)
+    unit = FakeCrossCheckUnitOfWork(snapshot, (product,), evidence)
+    service = EvidenceCrossCheckService(
+        lambda: unit,
+        FakeProvider(()),
+        independent_providers=(
+            FakeIndependentProvider(source_type=source_type, captured_at=captured_at),
+        ),
+        clock=lambda: NOW,
+    )
+
+    with pytest.raises(IndependentEvidenceScopeError, match="independent_review"):
+        asyncio.run(service.cross_check(snapshot.workflow.id))
+    assert unit.rolled_back and not unit.staged_evidence

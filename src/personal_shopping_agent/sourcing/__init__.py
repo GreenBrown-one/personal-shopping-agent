@@ -5,6 +5,13 @@ specification normalization. Platform parsers and the controlled browser live in
 ``platforms`` and ``browser`` adapter subpackages and are intentionally not re-exported here.
 """
 
+from personal_shopping_agent.sourcing.benchmarks import (
+    CHIP_PERFORMANCE_FIELD,
+    ChipBenchmarkEntry,
+    ChipBenchmarkEvidenceProvider,
+    ChipBenchmarkReference,
+    chip_name_token,
+)
 from personal_shopping_agent.sourcing.collection import (
     CandidateDiscovery,
     NoCandidatesDiscoveredError,
@@ -29,6 +36,8 @@ from personal_shopping_agent.sourcing.cross_check import (
     EvidenceCrossCheckService,
     EvidenceCrossCheckUnitOfWork,
     EvidenceCrossCheckUnitOfWorkFactory,
+    IndependentEvidenceProvider,
+    IndependentEvidenceScopeError,
     NoProductsForEvidenceCheckError,
     OfficialEvidenceIdentityMismatchError,
     OfficialEvidenceProvider,
@@ -79,8 +88,12 @@ from personal_shopping_agent.sourcing.observations import (
 )
 
 __all__ = [
+    "CHIP_PERFORMANCE_FIELD",
     "CandidateDiscovery",
     "CandidateDiscoveryService",
+    "ChipBenchmarkEntry",
+    "ChipBenchmarkEvidenceProvider",
+    "ChipBenchmarkReference",
     "CollectedPage",
     "ConvertedDetailBatch",
     "DetailConversionError",
@@ -93,6 +106,8 @@ __all__ = [
     "EvidenceCrossCheckService",
     "EvidenceCrossCheckUnitOfWork",
     "EvidenceCrossCheckUnitOfWorkFactory",
+    "IndependentEvidenceProvider",
+    "IndependentEvidenceScopeError",
     "NoCandidatesDiscoveredError",
     "NoDetailObservationsError",
     "NoProductsForEvidenceCheckError",
@@ -134,5 +149,6 @@ __all__ = [
     "SpecificationNormalizationStatus",
     "SpecificationNormalizationUnitOfWork",
     "SpecificationNormalizationUnitOfWorkFactory",
+    "chip_name_token",
     "evidence_source_for_store",
 ]

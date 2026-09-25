@@ -89,6 +89,7 @@ class EvidenceCrossCheckBatch(CrossCheckModel):
     """Official evidence and check rows staged by one workflow transaction."""
 
     official_evidence: tuple[Evidence, ...] = ()
+    independent_evidence: tuple[Evidence, ...] = ()
     checks: tuple[EvidenceCheck, ...] = Field(min_length=1)
 
 
@@ -116,6 +117,22 @@ class OfficialEvidenceProvider(Protocol):
     """Provider-neutral asynchronous port for manufacturer-controlled sources."""
 
     async def collect(self, product: Product) -> tuple[OfficialProductObservation, ...]: ...
+
+
+class IndependentEvidenceProvider(Protocol):
+    """Local port for third-party evidence such as dated benchmark rankings."""
+
+    def evidence_for(
+        self,
+        *,
+        request_id: UUID,
+        product: Product,
+        platform_evidence: tuple[Evidence, ...],
+    ) -> tuple[Evidence, ...]: ...
+
+
+class IndependentEvidenceScopeError(ValueError):
+    """Raised when an independent provider returns evidence outside its declared scope."""
 
 
 class EvidenceCrossCheckUnitOfWork(Protocol):
@@ -304,6 +321,27 @@ class ProductEvidenceChecker:
         )
 
 
+def _scoped_independent_evidence(
+    items: tuple[Evidence, ...],
+    *,
+    request_id: UUID,
+    product: Product,
+    checked_at: datetime,
+) -> tuple[Evidence, ...]:
+    for item in items:
+        if (
+            item.request_id != request_id
+            or item.subject_type is not EvidenceSubjectType.PRODUCT
+            or item.subject_id != product.id
+            or item.source_type is not EvidenceSourceType.INDEPENDENT_REVIEW
+            or item.captured_at > checked_at
+        ):
+            raise IndependentEvidenceScopeError(
+                "Independent evidence must be dated, product-scoped independent_review data."
+            )
+    return items
+
+
 class EvidenceCrossCheckService:
     """Collect official facts and atomically advance to evidence_cross_checked."""
 
@@ -313,11 +351,13 @@ class EvidenceCrossCheckService:
         provider: OfficialEvidenceProvider,
         *,
         checker: ProductEvidenceChecker | None = None,
+        independent_providers: tuple[IndependentEvidenceProvider, ...] = (),
         state_machine: WorkflowStateMachine | None = None,
         clock: Callable[[], datetime] = workflow_now,
     ) -> None:
         self._unit_of_work_factory = unit_of_work_factory
         self._provider = provider
+        self._independent_providers = independent_providers
         self._checker = checker or ProductEvidenceChecker()
         self._state_machine = state_machine or WorkflowStateMachine()
         self._clock = clock
@@ -341,6 +381,7 @@ class EvidenceCrossCheckService:
                 )
 
             evidence: list[Evidence] = []
+            independent: list[Evidence] = []
             checks: list[EvidenceCheck] = []
             checked_at = self._clock()
             for product in products:
@@ -358,12 +399,26 @@ class EvidenceCrossCheckService:
                 )
                 evidence.extend(batch.official_evidence)
                 checks.extend(batch.checks)
+                for independent_provider in self._independent_providers:
+                    independent.extend(
+                        _scoped_independent_evidence(
+                            independent_provider.evidence_for(
+                                request_id=snapshot.request.id,
+                                product=product,
+                                platform_evidence=platform_evidence,
+                            ),
+                            request_id=snapshot.request.id,
+                            product=product,
+                            checked_at=checked_at,
+                        )
+                    )
 
             complete_batch = EvidenceCrossCheckBatch(
                 official_evidence=tuple(evidence),
+                independent_evidence=tuple(independent),
                 checks=tuple(checks),
             )
-            for item in complete_batch.official_evidence:
+            for item in (*complete_batch.official_evidence, *complete_batch.independent_evidence):
                 unit_of_work.add_evidence(item)
             for check in complete_batch.checks:
                 unit_of_work.add_check(check)

@@ -8,6 +8,8 @@ DEFAULT_DATABASE_URL = "sqlite:///data/personal-shopping-agent.db"
 DATABASE_URL_ENV = "PERSONAL_SHOPPING_DATABASE_URL"
 LIVE_JD_ACCESS_ENV = "PERSONAL_SHOPPING_ENABLE_LIVE_JD"
 LIVE_JD_HEADLESS_ENV = "PERSONAL_SHOPPING_JD_HEADLESS"
+BENCHMARK_FILE_ENV = "PERSONAL_SHOPPING_BENCHMARK_FILE"
+DEFAULT_BENCHMARK_FILE = "data/benchmarks/socpk-allperf.json"
 
 
 class LiveJDConfigurationError(ValueError):
@@ -31,6 +33,13 @@ def database_url_from_environment(environment: Mapping[str, str] | None = None) 
 
     values = os.environ if environment is None else environment
     return values.get(DATABASE_URL_ENV, DEFAULT_DATABASE_URL)
+
+
+def benchmark_file_from_environment(environment: Mapping[str, str] | None = None) -> str:
+    """Read the private local chip benchmark reference path."""
+
+    values = os.environ if environment is None else environment
+    return values.get(BENCHMARK_FILE_ENV, DEFAULT_BENCHMARK_FILE)
 
 
 def load_live_jd_settings(environment: Mapping[str, str] | None = None) -> LiveJDSettings:

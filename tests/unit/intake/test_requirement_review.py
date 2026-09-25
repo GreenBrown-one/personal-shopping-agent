@@ -61,6 +61,7 @@ def test_complete_request_is_ready_to_start_and_rank() -> None:
         "display_size",
         "storage_capacity",
         "memory_capacity",
+        "chip_performance",
     ]
 
 

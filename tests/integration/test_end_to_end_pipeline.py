@@ -1,5 +1,7 @@
 """Offline SDK-level proof that the configured JD pipeline runs and resumes end to end."""
 
+# ruff: noqa: RUF001 -- JD specification fixtures intentionally use full-width punctuation.
+
 import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -10,7 +12,7 @@ from uuid import uuid4
 import pytest
 from mcp import Client
 from mcp.types import TextContent
-from pydantic import ValidationError
+from pydantic import HttpUrl, ValidationError
 
 from personal_shopping_agent.automation import (
     PIPELINE_STATE_SEQUENCE,
@@ -36,6 +38,11 @@ from personal_shopping_agent.interfaces.composition import NoOfficialEvidencePro
 from personal_shopping_agent.interfaces.mcp import create_jd_pipeline_server_for_database
 from personal_shopping_agent.presentation import (
     RenderedShoppingReport,
+)
+from personal_shopping_agent.sourcing import (
+    ChipBenchmarkEntry,
+    ChipBenchmarkEvidenceProvider,
+    ChipBenchmarkReference,
 )
 from personal_shopping_agent.sourcing.browser import BrowserSnapshot, NavigationPolicyError
 
@@ -338,3 +345,107 @@ def test_sign_in_wall_stops_with_login_instructions_and_stays_resumable(
         WorkflowState.REQUEST_VALIDATED
     )
     engine.dispose()
+
+
+class ChipSpecFixtureCollector(FixtureJDPageCollector):
+    """Serve the sanitized detail fixture with one declared chip specification line added."""
+
+    async def open(self, url: str, *, screenshot: bool = False) -> BrowserSnapshot:
+        page = await super().open(url, screenshot=screenshot)
+        if "item.jd.com" not in url:
+            return page
+        html = page.html.replace(
+            "<li>电池容量：6000mAh</li>",
+            "<li>电池容量：6000mAh</li><li>CPU型号：第三代骁龙8移动平台</li>",
+        )
+        assert html != page.html
+        return page.model_copy(update={"html": html})
+
+
+def test_chip_benchmark_evidence_flows_into_normalization_ranking_and_report(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'chip.db'}"
+    setup_engine = create_sqlite_engine(database_url)
+    create_schema(setup_engine)
+    setup_engine.dispose()
+    reference = ChipBenchmarkReference(
+        source_url=HttpUrl("https://www.socpk.com/allperf/?brand=phone"),
+        source_title="极客湾 SOCPK 手机/平板芯片综合性能排行",
+        method="synthetic test reference",
+        captured_at=datetime(2026, 1, 1, tzinfo=UTC),
+        entries=(
+            ChipBenchmarkEntry(name="骁龙 8 Gen3", score=Decimal("280")),
+            ChipBenchmarkEntry(name="骁龙 8 Elite Gen5", score=Decimal("420")),
+        ),
+    )
+    server = create_jd_pipeline_server_for_database(
+        database_url,
+        ChipSpecFixtureCollector(),
+        NoOfficialEvidenceProvider(),
+        environment={},
+        independent_providers=(ChipBenchmarkEvidenceProvider(reference),),
+    )
+
+    async def scenario() -> ShoppingPipelineResult:
+        async with Client(server, raise_exceptions=True) as client:
+            status = await client.call_tool("shopping_agent_status", {})
+            assert status.structured_content is not None
+            assert status.structured_content["chip_benchmark"] is True
+            started_call = await client.call_tool(
+                "start_shopping_workflow",
+                {
+                    "request": {
+                        "query": "Example Aurora Phone",
+                        "category": "smartphone",
+                        "budget_maximum": "5000",
+                        "region": "北京市",
+                        "criteria": [
+                            {
+                                "key": "battery_capacity",
+                                "minimum": "5000",
+                                "preferred": "6000",
+                                "unit": "mAh",
+                            },
+                            {
+                                "key": "chip_performance",
+                                "minimum": "100",
+                                "preferred": "420",
+                                "unit": "SOCPK",
+                            },
+                        ],
+                    }
+                },
+            )
+            assert started_call.structured_content is not None
+            started = WorkflowSnapshot.model_validate(started_call.structured_content)
+            run_call = await client.call_tool(
+                "run_shopping_pipeline",
+                {
+                    "request": {
+                        "workflow_id": str(started.workflow.id),
+                        "maximum_candidates": 1,
+                        "maximum_details": 1,
+                    }
+                },
+            )
+            assert run_call.structured_content is not None
+            return ShoppingPipelineResult.model_validate(run_call.structured_content)
+
+    result = asyncio.run(scenario())
+    candidate = result.rendered.report.candidates[0]
+    chip = next(
+        item
+        for item in candidate.score.foundation.criterion_evaluations
+        if item.key == "chip_performance"
+    )
+    assert chip.status.value == "satisfied"
+    assert chip.observed_values == (Decimal("280"),)
+    # 0.5 + 0.5 * (280 - 100) / (420 - 100)
+    assert chip.score == Decimal("0.78125")
+    assert any(
+        item.field_path == "specifications.chip_performance"
+        and item.source_type.value == "independent_review"
+        for item in candidate.evidence
+    )
+    assert "| chip\\_performance |" in result.rendered.content

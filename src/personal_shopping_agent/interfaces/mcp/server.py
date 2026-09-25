@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
@@ -18,8 +19,13 @@ from personal_shopping_agent.automation import (
 from personal_shopping_agent.domain import (
     WorkflowSnapshot,
 )
+from personal_shopping_agent.infrastructure.benchmark_store import (
+    BenchmarkStoreError,
+    LocalJsonBenchmarkStore,
+)
 from personal_shopping_agent.infrastructure.settings import (
     LiveJDConfigurationError,
+    benchmark_file_from_environment,
     database_url_from_environment,
     load_live_jd_settings,
 )
@@ -63,6 +69,8 @@ from personal_shopping_agent.presentation.llm import (
 )
 from personal_shopping_agent.presentation.rendering import HtmlShoppingReportRenderer
 from personal_shopping_agent.sourcing import (
+    ChipBenchmarkEvidenceProvider,
+    IndependentEvidenceProvider,
     OfficialEvidenceProvider,
     PageCollector,
 )
@@ -118,6 +126,7 @@ def create_mcp_server(
     explanation_provider: ExplanationProviderKind = ExplanationProviderKind.DISABLED,
     pipeline_service: ShoppingDecisionPipelineService | None = None,
     requirement_reviewer: RequirementReviewer | None = None,
+    chip_benchmark: bool = False,
     lifespan: ServerLifespan | None = None,
 ) -> MCPServer[None]:
     """Register a deterministic, dependency-injected MCP server."""
@@ -169,6 +178,7 @@ def create_mcp_server(
             platform_collection=pipeline_service is not None,
             cross_platform_comparison=False,
             ranking=pipeline_service is not None,
+            chip_benchmark=chip_benchmark,
             deterministic_reports=True,
             html_reports=True,
             llm_explanations=explanation_provider is not ExplanationProviderKind.DISABLED,
@@ -301,6 +311,7 @@ def _create_server_for_session_factory(
     settings: LLMExplanationSettings,
     *,
     pipeline_service: ShoppingDecisionPipelineService | None = None,
+    chip_benchmark: bool = False,
     lifespan: ServerLifespan | None = None,
 ) -> MCPServer[None]:
     return create_mcp_server(
@@ -313,6 +324,7 @@ def _create_server_for_session_factory(
         ),
         explanation_provider=settings.provider,
         pipeline_service=pipeline_service,
+        chip_benchmark=chip_benchmark,
         lifespan=lifespan,
     )
 
@@ -337,6 +349,7 @@ def create_jd_pipeline_server_for_database(
     *,
     environment: Mapping[str, str] | None = None,
     lifespan: ServerLifespan | None = None,
+    independent_providers: tuple[IndependentEvidenceProvider, ...] = (),
 ) -> MCPServer[None]:
     """Compose an explicitly enabled JD pipeline around caller-owned safe external ports."""
 
@@ -347,13 +360,28 @@ def create_jd_pipeline_server_for_database(
         session_factory,
         page_collector,
         official_evidence_provider,
+        independent_providers=independent_providers,
     )
     return _create_server_for_session_factory(
         session_factory,
         settings,
         pipeline_service=pipeline_service,
+        chip_benchmark=bool(independent_providers),
         lifespan=lifespan,
     )
+
+
+def load_chip_benchmark_providers(
+    environment: Mapping[str, str] | None = None,
+) -> tuple[IndependentEvidenceProvider, ...]:
+    """Enable chip evidence only from a present, private, valid local reference."""
+
+    store = LocalJsonBenchmarkStore(Path(benchmark_file_from_environment(environment)))
+    try:
+        reference = store.load()
+    except BenchmarkStoreError:
+        return ()
+    return () if reference is None else (ChipBenchmarkEvidenceProvider(reference),)
 
 
 def _collector_lifespan(collector: ManagedStatusPageCollector) -> ServerLifespan:
@@ -395,6 +423,7 @@ def create_live_jd_server_for_database(
         NoOfficialEvidenceProvider(),
         environment=environment,
         lifespan=_collector_lifespan(collector),
+        independent_providers=load_chip_benchmark_providers(environment),
     )
 
 

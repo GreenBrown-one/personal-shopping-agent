@@ -21,7 +21,14 @@ from personal_shopping_agent.automation import (
     WorkflowDeletionPlanStaleError,
 )
 from personal_shopping_agent.evolution import ImprovementCaseBuilder, is_stable_code
-from personal_shopping_agent.infrastructure.settings import database_url_from_environment
+from personal_shopping_agent.infrastructure.benchmark_store import (
+    BenchmarkStoreError,
+    LocalJsonBenchmarkStore,
+)
+from personal_shopping_agent.infrastructure.settings import (
+    benchmark_file_from_environment,
+    database_url_from_environment,
+)
 from personal_shopping_agent.infrastructure.storage import (
     DatabaseMigrationError,
     DatabaseMigrationStatus,
@@ -36,19 +43,34 @@ from personal_shopping_agent.infrastructure.storage import (
     require_current_database,
     upgrade_database,
 )
-from personal_shopping_agent.interfaces.composition import create_jd_sign_in_policy
+from personal_shopping_agent.interfaces.composition import (
+    create_benchmark_policy,
+    create_jd_sign_in_policy,
+)
 from personal_shopping_agent.interfaces.health import health_check
 from personal_shopping_agent.interfaces.host_config import (
     SourceCheckoutError,
     build_source_mcp_configuration,
 )
+from personal_shopping_agent.sourcing.benchmarks import (
+    ChipBenchmarkReference,
+    chip_name_token,
+    suggested_chip_criterion,
+)
 from personal_shopping_agent.sourcing.browser import (
     BrowserManager,
     BrowserManagerError,
     BrowserManagerSettings,
+    ControlledPageCollector,
     NavigationPolicyError,
+    StatusPageCollector,
 )
 from personal_shopping_agent.sourcing.platforms.jd import JD_SIGN_IN_URL
+from personal_shopping_agent.sourcing.platforms.socpk import (
+    SOCPK_OVERALL_URL,
+    BenchmarkPageParseError,
+    SocpkRankingParser,
+)
 
 SIGN_IN_INSTRUCTIONS = (
     "A visible browser window opened with the dedicated local profile. Sign in to JD yourself "
@@ -65,6 +87,26 @@ class SignInBrowser(Protocol):
     async def open(self, url: str, *, screenshot: bool = False) -> object: ...
 
     async def close(self) -> None: ...
+
+
+class BenchmarkBrowser(StatusPageCollector, Protocol):
+    """A status-aware page collector with an explicit lifecycle."""
+
+    async def start(self) -> None: ...
+
+    async def close(self) -> None: ...
+
+
+def create_benchmark_browser() -> BenchmarkBrowser:
+    """A headless browser with its own profile, separate from any signed-in shop profile."""
+
+    return BrowserManager(
+        create_benchmark_policy(),
+        settings=BrowserManagerSettings(
+            profile_directory=Path("data/browser-profiles/benchmarks"),
+            headless=True,
+        ),
+    )
 
 
 def create_sign_in_browser() -> SignInBrowser:
@@ -124,6 +166,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     delete_parser.add_argument("workflow_id")
     delete_parser.add_argument("--confirm")
+    benchmark_parser = commands.add_parser(
+        "benchmark",
+        help="refresh or show the private local chip performance reference",
+    )
+    benchmark_commands = benchmark_parser.add_subparsers(dest="benchmark_command", required=True)
+    benchmark_commands.add_parser(
+        "refresh",
+        help="read the public Geekerwan SOCPK ranking page once and save it locally",
+    )
+    show_parser = benchmark_commands.add_parser("show", help="print the stored chip scores")
+    show_parser.add_argument("--filter", help="only chips whose folded name contains this text")
     login_parser = commands.add_parser(
         "login",
         help="sign in yourself in a visible browser using the dedicated local profile",
@@ -408,6 +461,96 @@ def _run_improvement_case(
     return 0
 
 
+async def _collect_benchmark(browser: BenchmarkBrowser) -> ChipBenchmarkReference:
+    try:
+        await browser.start()
+        page = await ControlledPageCollector(browser).open(SOCPK_OVERALL_URL)
+        return SocpkRankingParser().parse(page)
+    finally:
+        await browser.close()
+
+
+def _reference_summary(reference: ChipBenchmarkReference) -> dict[str, object]:
+    return {
+        "captured_at": reference.captured_at.isoformat(),
+        "chips": len(reference.entries),
+        "method": reference.method,
+        "source_title": reference.source_title,
+        "source_url": str(reference.source_url),
+        "suggested_criterion": suggested_chip_criterion(reference),
+    }
+
+
+def _run_benchmark(
+    namespace: argparse.Namespace,
+    *,
+    environment: Mapping[str, str] | None,
+    browser_factory: Callable[[], BenchmarkBrowser],
+) -> int:
+    subcommand = cast(str, namespace.benchmark_command)
+    command = f"benchmark_{subcommand}"
+    store = LocalJsonBenchmarkStore(Path(benchmark_file_from_environment(environment)))
+    if subcommand == "refresh":
+        try:
+            reference = asyncio.run(_collect_benchmark(browser_factory()))
+            store.save(reference)
+        except (BrowserManagerError, NavigationPolicyError):
+            _emit_data_error(
+                "benchmark_page_unavailable",
+                "The ranking page could not be opened safely; nothing was saved.",
+                command=command,
+            )
+            return 2
+        except BenchmarkPageParseError:
+            _emit_data_error(
+                "benchmark_page_unrecognized",
+                "The ranking page layout was not recognized; nothing was saved.",
+                command=command,
+            )
+            return 2
+        except BenchmarkStoreError:
+            _emit_data_error(
+                "benchmark_store_failed",
+                "The private benchmark file could not be written.",
+                command=command,
+            )
+            return 2
+        _emit({"command": command, "ok": True, **_reference_summary(reference)})
+        return 0
+
+    try:
+        reference = store.load()
+    except BenchmarkStoreError:
+        _emit_data_error(
+            "benchmark_unreadable",
+            "The private benchmark file is unreadable or not private; refresh it.",
+            command=command,
+        )
+        return 2
+    if reference is None:
+        _emit_data_error(
+            "benchmark_missing",
+            "Run `personal-shopping-agent benchmark refresh` first.",
+            command=command,
+        )
+        return 1
+    text_filter = cast(str | None, namespace.filter)
+    token = chip_name_token(text_filter) if text_filter else ""
+    entries = sorted(
+        (item for item in reference.entries if token in chip_name_token(item.name)),
+        key=lambda item: (-item.score, item.name),
+    )
+    _emit(
+        {
+            "command": command,
+            "entries": [{"name": item.name, "score": format(item.score, "f")} for item in entries],
+            "ok": True,
+            **_reference_summary(reference),
+        }
+    )
+    return 0
+
+
 async def _sign_in_session(browser: SignInBrowser, wait_for_user: Callable[[], None]) -> str:
     try:
         await browser.start()
@@ -463,6 +606,7 @@ def main(
     environment: Mapping[str, str] | None = None,
     sign_in_browser_factory: Callable[[], SignInBrowser] = create_sign_in_browser,
     wait_for_user: Callable[[], None] = wait_for_enter,
+    benchmark_browser_factory: Callable[[], BenchmarkBrowser] = create_benchmark_browser,
 ) -> int:
     """Execute one non-interactive command and return a process exit code."""
 
@@ -487,6 +631,13 @@ def main(
 
     if command_name == "improvement-case":
         return _run_improvement_case(namespace, environment=environment)
+
+    if command_name == "benchmark":
+        return _run_benchmark(
+            namespace,
+            environment=environment,
+            browser_factory=benchmark_browser_factory,
+        )
 
     if command_name == "login":
         return _run_login(
