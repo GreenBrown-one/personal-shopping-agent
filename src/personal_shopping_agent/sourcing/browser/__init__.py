@@ -21,6 +21,11 @@ from personal_shopping_agent.sourcing.browser.policy import (
     NavigationPolicyError,
     ValidatedURL,
 )
+from personal_shopping_agent.sourcing.browser.saved_pages import (
+    SavedPageCollector,
+    SavedPageInboxError,
+    SavedPageMissingError,
+)
 
 __all__ = [
     "BrowserManager",
@@ -34,6 +39,9 @@ __all__ = [
     "PageAccessRestrictedError",
     "PageAccessSettings",
     "PageCollectionFailedError",
+    "SavedPageCollector",
+    "SavedPageInboxError",
+    "SavedPageMissingError",
     "StatusPage",
     "StatusPageCollector",
     "TransientBrowserManagerError",

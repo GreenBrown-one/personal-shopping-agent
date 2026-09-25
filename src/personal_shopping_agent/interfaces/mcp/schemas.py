@@ -112,6 +112,7 @@ class AgentCapabilities(MCPModel):
     cross_platform_comparison: bool
     ranking: bool
     chip_benchmark: bool
+    collection_mode: str
     deterministic_reports: bool
     html_reports: bool
     llm_explanations: bool

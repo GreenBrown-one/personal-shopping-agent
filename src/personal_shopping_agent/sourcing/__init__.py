@@ -5,6 +5,12 @@ specification normalization. Platform parsers and the controlled browser live in
 ``platforms`` and ``browser`` adapter subpackages and are intentionally not re-exported here.
 """
 
+from personal_shopping_agent.sourcing.assisted import (
+    PageToSave,
+    SavedPageIndex,
+    SavedPagePlan,
+    SavedPagePlanner,
+)
 from personal_shopping_agent.sourcing.benchmarks import (
     CHIP_PERFORMANCE_FIELD,
     ChipBenchmarkEntry,
@@ -122,6 +128,7 @@ __all__ = [
     "OfficialProductObservation",
     "OfficialSpecificationObservation",
     "PageCollector",
+    "PageToSave",
     "PlatformAccessRestrictedError",
     "PlatformCandidate",
     "PlatformDetailAdapter",
@@ -138,6 +145,9 @@ __all__ = [
     "ProductDetailService",
     "ProductEvidenceChecker",
     "ProductSpecificationNormalizer",
+    "SavedPageIndex",
+    "SavedPagePlan",
+    "SavedPagePlanner",
     "SearchDetailCollectionResult",
     "SearchDetailCollectionService",
     "SearchDetailUnitOfWork",

@@ -296,7 +296,7 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
 
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
-            assert status.structured_content["milestone"] == "M8"
+            assert status.structured_content["milestone"] == "M9"
             assert status.structured_content["requirement_review"] is True
             assert status.structured_content["end_to_end_pipeline"] is False
             assert status.structured_content["platform_collection"] is False
@@ -307,8 +307,9 @@ def test_mcp_tools_are_discoverable_and_round_trip_structured_workflows() -> Non
             assert status.structured_content["llm_explanations"] is False
             assert status.structured_content["llm_explanation_provider"] == "disabled"
             assert status.structured_content["automatic_purchase"] is False
+            assert status.structured_content["collection_mode"] == "none"
             assert status.structured_content["message"] == (
-                "M8 local MCP is ready; live platform collection is not configured."
+                "Local workflows and reports are ready; no platform collection is set up."
             )
 
             started_result = await client.call_tool(
