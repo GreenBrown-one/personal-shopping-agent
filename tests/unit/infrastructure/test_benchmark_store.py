@@ -1,5 +1,6 @@
 """The chip benchmark reference is stored privately and fails closed when unsafe."""
 
+import os
 import stat
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -25,7 +26,12 @@ REFERENCE = ChipBenchmarkReference(
 )
 
 
-def test_save_and_load_round_trip_with_owner_only_permissions(tmp_path: Path) -> None:
+posix_only = pytest.mark.skipif(
+    os.name != "posix", reason="owner-only mode bits are enforced only on POSIX hosts"
+)
+
+
+def test_save_and_load_round_trip(tmp_path: Path) -> None:
     path = tmp_path / "benchmarks" / "socpk.json"
     store = LocalJsonBenchmarkStore(path)
 
@@ -34,22 +40,40 @@ def test_save_and_load_round_trip_with_owner_only_permissions(tmp_path: Path) ->
     store.save(REFERENCE)  # refreshing replaces the previous snapshot
 
     assert store.load() == REFERENCE
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
     assert [item.name for item in path.parent.iterdir()] == ["socpk.json"]
 
 
-def test_unsafe_or_invalid_files_are_rejected(tmp_path: Path) -> None:
+@posix_only
+def test_saved_reference_has_owner_only_permissions(tmp_path: Path) -> None:
+    path = tmp_path / "benchmarks" / "socpk.json"
+    LocalJsonBenchmarkStore(path).save(REFERENCE)
+
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+
+
+def test_nonregular_or_invalid_files_are_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "benchmarks" / "socpk.json"
+    store = LocalJsonBenchmarkStore(path)
+    path.mkdir(parents=True)
+    with pytest.raises(BenchmarkStoreError, match="not private"):
+        store.load()
+
+    path.rmdir()
+    store.save(REFERENCE)
+    path.write_text("{}", encoding="utf-8")
+    with pytest.raises(BenchmarkStoreError, match="unreadable"):
+        store.load()
+
+
+@posix_only
+def test_broadly_readable_files_are_rejected(tmp_path: Path) -> None:
     path = tmp_path / "benchmarks" / "socpk.json"
     store = LocalJsonBenchmarkStore(path)
     store.save(REFERENCE)
 
     path.chmod(0o644)
     with pytest.raises(BenchmarkStoreError, match="not private"):
-        store.load()
-    path.chmod(0o600)
-    path.write_text("{}", encoding="utf-8")
-    with pytest.raises(BenchmarkStoreError, match="unreadable"):
         store.load()
 
 

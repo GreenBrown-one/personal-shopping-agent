@@ -186,6 +186,19 @@ def test_in_memory_database_status_is_supported_without_claiming_readiness() -> 
     assert status.ready is False
 
 
+def test_doctor_fails_closed_when_the_database_path_is_not_a_regular_file(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "directory.db"
+    database_path.mkdir()
+
+    status = inspect_database_migrations(f"sqlite:///{database_path}")
+
+    assert status.database_exists is True
+    assert status.private_file_permissions is False
+    assert status.ready is False
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX permission bits are unavailable")
 def test_doctor_fails_closed_and_migrate_repairs_broad_database_permissions(
     tmp_path: Path,

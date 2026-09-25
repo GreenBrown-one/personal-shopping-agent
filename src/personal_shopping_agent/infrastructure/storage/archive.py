@@ -40,7 +40,7 @@ class LocalJsonWorkflowArchiveWriter:
             )
             created = True
             descriptor_chmod = getattr(os, "fchmod", None)
-            if descriptor_chmod is not None:
+            if descriptor_chmod is not None:  # pragma: posix-only
                 descriptor_chmod(descriptor, 0o600)
             with os.fdopen(descriptor, "wb") as destination:
                 destination.write(payload)

@@ -179,10 +179,25 @@ def test_jd_page_identity(url: str, key: str | None) -> None:
     assert jd_page_key(url) == key
 
 
-def test_a_shared_inbox_is_refused_with_an_actionable_message(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "file",
+        pytest.param(
+            "shared",
+            marks=pytest.mark.skipif(
+                os.name != "posix", reason="owner-only mode bits are enforced only on POSIX hosts"
+            ),
+        ),
+    ],
+)
+def test_a_shared_inbox_is_refused_with_an_actionable_message(tmp_path: Path, kind: str) -> None:
     inbox = tmp_path / "inbox"
-    inbox.mkdir()
-    inbox.chmod(0o755)
+    if kind == "file":
+        inbox.write_text("not a directory")
+    else:
+        inbox.mkdir()
+        inbox.chmod(0o755)
 
     with pytest.raises(SavedPageInboxError) as refused:
         collector(inbox).saved_pages()

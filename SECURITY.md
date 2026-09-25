@@ -31,8 +31,9 @@
 `personal-shopping-agent doctor` 会返回 `private_file_permissions`。POSIX 文件安全时为 `true`，权限过宽、
 目标不是普通文件或存在额外硬链接时为 `false`，并把数据库判为未就绪。运行
 `personal-shopping-agent migrate` 可以修复普通数据库文件的过宽权限；可疑链接或非普通文件会失败关闭。
-Windows 无可移植的 POSIX mode 判断，因此该字段为 `null`；Windows 用户应使用仅当前用户可访问的 NTFS
-目录和磁盘加密。
+Windows 无可移植的 POSIX mode 判断，因此该字段为 `null`（未知，不代表安全），但符号链接和非普通
+文件/目录仍会失败关闭；Windows 用户应使用仅当前用户可访问的 NTFS 目录和磁盘加密（见 `DESIGN.md`
+第 8.1 节）。
 
 ## 浏览器与外部模型
 
