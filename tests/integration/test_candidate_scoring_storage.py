@@ -11,16 +11,8 @@ from pydantic import HttpUrl
 from sqlalchemy import Engine, event, func, select
 from sqlalchemy.exc import IntegrityError
 
-from personal_shopping_agent.application import (
-    CandidateScore,
-    CandidateScoringService,
-    EvidenceCheck,
-    EvidenceCheckStatus,
-    NormalizedSpecification,
+from personal_shopping_agent.automation import (
     ShoppingWorkflowService,
-    SpecificationNormalizationStatus,
-    WorkflowSnapshot,
-    WorkflowState,
 )
 from personal_shopping_agent.domain import (
     Budget,
@@ -34,8 +26,10 @@ from personal_shopping_agent.domain import (
     ShoppingCriterion,
     ShoppingRequest,
     StoreType,
+    WorkflowSnapshot,
+    WorkflowState,
 )
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     SQLiteCandidateScoringUnitOfWork,
     SQLiteShoppingRepository,
     SQLiteWorkflowRepository,
@@ -44,12 +38,26 @@ from personal_shopping_agent.storage import (
     create_sqlite_engine,
     session_scope,
 )
-from personal_shopping_agent.storage.cross_check_unit_of_work import evidence_check_record
-from personal_shopping_agent.storage.normalization_unit_of_work import (
+from personal_shopping_agent.infrastructure.storage.cross_check_unit_of_work import (
+    evidence_check_record,
+)
+from personal_shopping_agent.infrastructure.storage.normalization_unit_of_work import (
     normalized_specification_record,
 )
-from personal_shopping_agent.storage.scoring_unit_of_work import candidate_score_record
-from personal_shopping_agent.storage.tables import CandidateScoreRecord
+from personal_shopping_agent.infrastructure.storage.scoring_unit_of_work import (
+    candidate_score_record,
+)
+from personal_shopping_agent.infrastructure.storage.tables import CandidateScoreRecord
+from personal_shopping_agent.presentation import (
+    CandidateScore,
+    CandidateScoringService,
+)
+from personal_shopping_agent.sourcing import (
+    EvidenceCheck,
+    EvidenceCheckStatus,
+    NormalizedSpecification,
+    SpecificationNormalizationStatus,
+)
 
 NOW = datetime(2026, 8, 10, 1, 0, tzinfo=UTC)
 

@@ -9,20 +9,20 @@ from typing import cast
 import pytest
 from alembic.config import Config
 
-import personal_shopping_agent.cli as cli_module
-import personal_shopping_agent.storage.migrations as migration_module
+import personal_shopping_agent.infrastructure.storage.migrations as migration_module
+import personal_shopping_agent.interfaces.cli as cli_module
 from personal_shopping_agent import __version__
-from personal_shopping_agent.cli import main
-from personal_shopping_agent.local_security import LocalFileSecurityError
-from personal_shopping_agent.mcp import create_default_server
-from personal_shopping_agent.runtime_settings import DATABASE_URL_ENV, LIVE_JD_ACCESS_ENV
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.local_security import LocalFileSecurityError
+from personal_shopping_agent.infrastructure.settings import DATABASE_URL_ENV, LIVE_JD_ACCESS_ENV
+from personal_shopping_agent.infrastructure.storage import (
     DatabaseMigrationError,
     DatabaseMigrationStatus,
     DatabaseSchemaNotReadyError,
     inspect_database_migrations,
     require_current_database,
 )
+from personal_shopping_agent.interfaces.cli import main
+from personal_shopping_agent.interfaces.mcp import create_default_server
 
 
 def _output(capsys: pytest.CaptureFixture[str]) -> dict[str, object]:

@@ -24,6 +24,7 @@ htmlcov/
 data/*.db
 data/*.sqlite*
 data/browser-profiles/
+data/benchmarks/
 artifacts/
 reports/
 screenshots/

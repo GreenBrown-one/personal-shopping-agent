@@ -16,28 +16,17 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
-import personal_shopping_agent.cli as cli_module
-from personal_shopping_agent.application import (
+import personal_shopping_agent.interfaces.cli as cli_module
+from personal_shopping_agent.automation import (
     ArchiveWriteError,
-    DetailObservation,
-    OfferIngestionService,
-    PlatformCandidate,
-    PlatformProductDetail,
-    PlatformSearchResult,
-    PlatformSpecificationObservation,
-    SearchObservation,
     ShoppingPipelineOptions,
     ShoppingWorkflowService,
     WorkflowDataIntegrityError,
     WorkflowDataLifecycleService,
     WorkflowDataOwnershipError,
     WorkflowDeletionPlanStaleError,
-    WorkflowState,
-    WorkflowStateMachine,
 )
-from personal_shopping_agent.application.data_lifecycle import WorkflowDataArchive
-from personal_shopping_agent.browser import BrowserSnapshot
-from personal_shopping_agent.cli import main
+from personal_shopping_agent.automation.data_lifecycle import WorkflowDataArchive
 from personal_shopping_agent.domain import (
     Budget,
     Evidence,
@@ -47,9 +36,10 @@ from personal_shopping_agent.domain import (
     Product,
     ShoppingCriterion,
     ShoppingRequest,
+    WorkflowState,
+    WorkflowStateMachine,
 )
-from personal_shopping_agent.runtime import NoOfficialEvidenceProvider, create_jd_pipeline_service
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     DatabaseMigrationError,
     EntityNotFoundError,
     LocalJsonWorkflowArchiveWriter,
@@ -63,7 +53,7 @@ from personal_shopping_agent.storage import (
     session_scope,
     upgrade_database,
 )
-from personal_shopping_agent.storage.tables import (
+from personal_shopping_agent.infrastructure.storage.tables import (
     EvidenceRecord,
     OfferRecord,
     PlatformObservationRecord,
@@ -72,7 +62,22 @@ from personal_shopping_agent.storage.tables import (
     WorkflowEventRecord,
     WorkflowRecord,
 )
-from personal_shopping_agent.storage.workflow_repository import workflow_record
+from personal_shopping_agent.infrastructure.storage.workflow_repository import workflow_record
+from personal_shopping_agent.interfaces.cli import main
+from personal_shopping_agent.interfaces.composition import (
+    NoOfficialEvidenceProvider,
+    create_jd_pipeline_service,
+)
+from personal_shopping_agent.sourcing import (
+    DetailObservation,
+    OfferIngestionService,
+    PlatformCandidate,
+    PlatformProductDetail,
+    PlatformSearchResult,
+    PlatformSpecificationObservation,
+    SearchObservation,
+)
+from personal_shopping_agent.sourcing.browser import BrowserSnapshot
 
 NOW = datetime(2026, 8, 10, 0, 0, tzinfo=UTC)
 

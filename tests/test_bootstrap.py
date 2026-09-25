@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import cast
 
-from personal_shopping_agent.runtime_settings import DATABASE_URL_ENV
+from personal_shopping_agent.infrastructure.settings import DATABASE_URL_ENV
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "scripts" / "bootstrap.py"

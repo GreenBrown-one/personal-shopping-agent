@@ -6,7 +6,7 @@
 
 默认服务适合：
 
-- 让支持本地 stdio MCP 的 AI 宿主理解自然语言并创建结构化购物任务；
+- 让支持本地 stdio MCP 的 AI 宿主理解自然语言，先用 `review_shopping_request` 审查需求并追问缺口，再创建结构化购物任务；
 - 查询本地工作流状态；
 - 读取已经生成的确定性 Markdown / HTML 报告；
 - 在明确配置 OpenAI 或 DeepSeek 后请求可选解释。
@@ -102,26 +102,77 @@ stdio MCP 会等待宿主通信，因此终端没有普通交互提示是正常�
 }
 ```
 
-Windows 可以使用正斜杠路径，例如 `C:/Users/name/personal-shopping-agent`。必须改成实际绝对路径。浏览器型 AI 宿主如果不能启动本地进程，则需要额外的受控远程 MCP 网关；本仓库目前不提供该网关。
+Windows 可以使用正斜杠路径，例如 `C:/Users/name/personal-shopping-agent`。必须改成实际绝对路径。
 
-连接后先让 AI 调用 `shopping_agent_status`。默认结果应明确显示：本地工作流和报告可用，而 `platform_collection` 与 `end_to_end_pipeline` 为 `false`。
+**推荐宿主：Claude Desktop（Windows / macOS）。** 打开 设置 → 开发者 → 编辑配置，把 `mcp-config` 输出中
+`config` 里的 `mcpServers` 块合并进 `claude_desktop_config.json`（Windows 位于
+`%APPDATA%\Claude\`），保存后完全退出并重新打开 Claude Desktop。若提示找不到 `uv`，安装 uv 后重启电脑
+让 PATH 生效。购物对话建议在 Claude Desktop 中进行；修改本项目代码请在单独的开发会话（如 Claude Code）
+中进行，避免网页内容与代码修改权限出现在同一个会话里（见 `DESIGN.md` 3.1）。浏览器型 AI 宿主如果不能启动本地进程，则需要额外的受控远程 MCP 网关；本仓库目前不提供该网关。
 
-### 显式京东模式
+连接后先让 AI 调用 `shopping_agent_status`。默认结果应明确显示：需求审查、本地工作流和报告可用，而 `platform_collection` 与 `end_to_end_pipeline` 为 `false`。
 
-只有准备进行电脑端人工验收时才生成京东配置：
+创建任务前，AI 应调用 `review_shopping_request`。它不存储、不联网，只按评分规则指出问题：例如条件缺少
+最小/最大值方向、使用了评分无法识别的键（如“内存”应写作 `memory_capacity`）或单位与规范单位不一致。
+存在阻断问题时 `start_shopping_workflow` 会直接拒绝，避免在真实采集后才发现需求无法评分。
+
+### 显式京东模式与首次真实测试
+
+京东网页版现在要求登录后才能搜索。以下步骤全部在你自己的电脑上、在项目目录中执行：
+
+1. 安装浏览器（只需一次）：
+
+   ```bash
+   uv run --locked playwright install chromium
+   ```
+
+2. 亲自登录京东（登录失效后重复这一步）：
+
+   ```bash
+   uv run --locked personal-shopping-agent login jd
+   ```
+
+   会打开一个可见的浏览器窗口，由你本人输入账号并完成验证；完成后回到终端按回车关闭。程序不读取、
+   不保存密码，登录状态只保存在本机私有目录 `data/browser-profiles/`（已被 Git 忽略）。
+
+3. 生成京东 MCP 配置并替换宿主中的默认配置，然后重启 AI 宿主：
+
+   ```bash
+   uv run --locked personal-shopping-agent mcp-config --live-jd
+   ```
+
+   该配置选择 `personal-shopping-agent-mcp-jd`，显式设置 `PERSONAL_SHOPPING_ENABLE_LIVE_JD=true`，
+   并默认 `PERSONAL_SHOPPING_JD_HEADLESS=false`，让你能看到每一个被打开的页面并随时介入。
+
+4. 在 AI 宿主中依次让它：调用 `shopping_agent_status`（确认 `platform_collection=true`）→ 用你的原话
+   描述需求并调用 `review_shopping_request` 直到没有阻断问题 → `start_shopping_workflow` →
+   `run_shopping_pipeline`（首次建议 `maximum_candidates=10`、`maximum_details=3`）→ `get_shopping_report`。
+
+**可选：芯片性能评分。** 京东规格里的芯片型号（如“CPU型号：第三代骁龙8”）可以换算成极客湾 SOCPK
+综合性能分（CPU 70%、GPU 30%，骁龙 865 = 100）参与评分：
 
 ```bash
-uv run --locked playwright install chromium
-uv run --locked personal-shopping-agent mcp-config --live-jd
+uv run --locked personal-shopping-agent benchmark refresh   # 读取一次公开排行页，建议每月最多一次
+uv run --locked personal-shopping-agent benchmark show --filter 骁龙8
 ```
 
-该配置选择 `personal-shopping-agent-mcp-jd` 并显式设置
-`PERSONAL_SHOPPING_ENABLE_LIVE_JD=true`。浏览器随 MCP 会话启动和关闭，只允许精确的京东搜索与商品主机，
-仍执行公网 DNS、HTTPS、限频、重试上限、交易路径阻断和验证码停止规则。默认使用 headless 模式；需要
-观察人工登录/验证界面时，可在本地配置中增加 `PERSONAL_SHOPPING_JD_HEADLESS=false`。
+`refresh` 使用独立的无界面浏览器资料，只读取页面渲染后的表格，结果只保存在本机私有文件
+`data/benchmarks/socpk-allperf.json`，不进入 Git。输出中的 `suggested_criterion` 是“越高越好”的加分项：
+骁龙 865 基准（100 分）得半分，榜单最高分得满分，不排除任何候选。刷新后需要重启 AI 宿主，
+`shopping_agent_status` 中 `chip_benchmark=true` 表示已启用。芯片未收录或名称不能精确对应时，该项按缺失
+处理并在报告中显示，不做猜测。
 
-首次真实运行必须检查 `shopping_agent_status`、用非敏感测试查询验证页面结构，并在最终购买前人工复核
-价格和商品。403、429、验证码、登录要求、无候选或解析失败都表示尚未通过真实环境验收，不能绕过。
+页面自身的脚本、图片和价格数据只允许来自 `jd.com`、
+`360buyimg.com`、`3.cn`；同一主机两次访问至少间隔 3 秒；交易路径、下载和私网地址始终被阻止。
+遇到以下情况系统会停止而不是绕过：
+
+| 返回 | 含义与处理 |
+|---|---|
+| `sign_in_required` | 登录已失效，重新运行 `login jd` 后再次调用 `run_shopping_pipeline`，会从上次成功阶段继续 |
+| `jd_access_restricted`、403、429 | 京东要求验证或限流；停止使用一段时间，必要时在浏览器中手动处理，不要提高频率 |
+| 解析失败或没有候选 | 页面结构可能已变化；运行 `improvement-case` 生成脱敏案例并反馈 |
+
+真实页面结构只能在你的电脑上验收。首次运行后请人工核对报告中的价格与商品页面是否一致。
 
 ## 6. 可选模型解释
 
@@ -153,9 +204,17 @@ uv run personal-shopping-agent doctor
 uv run personal-shopping-agent migrate
 uv run personal-shopping-agent data export <WORKFLOW_UUID> --output workflow-export.json
 uv run personal-shopping-agent data delete <WORKFLOW_UUID>
+uv run personal-shopping-agent improvement-case <WORKFLOW_UUID> --error-code <stable_error_code>
+uv run personal-shopping-agent login jd
+uv run personal-shopping-agent benchmark refresh
+uv run personal-shopping-agent benchmark show --filter <芯片名>
 ```
 
 删除命令第一次只生成预览和确认 token，不会立即删除。完整隐私与权限规则见 [`SECURITY.md`](../SECURITY.md)。
+
+`improvement-case` 只在终端打印一份脱敏改进案例预览：软件版本、停在哪个阶段、稳定错误码和需求结构
+摘要（条件数量、受支持的规范键等），不包含查询文字、品类、地区、金额、商品、卖家或链接，也不写文件、
+不上传。是否把它粘贴到私有 Issue 交给维护者或维护型 AI，由你决定。
 
 ## 8. 故障排查
 
@@ -165,7 +224,9 @@ uv run personal-shopping-agent data delete <WORKFLOW_UUID>
 | `doctor` 返回数据库未就绪 | 运行 `uv run personal-shopping-agent migrate` |
 | MCP 启动后没有普通文字界面 | 正常；它在等待 MCP 宿主通过 stdio 通信 |
 | AI 看不到 `run_shopping_pipeline` | 默认组合故意未开启真实平台采集 |
+| `start_shopping_workflow` 提示需要澄清 | 先调用 `review_shopping_request`，按每条建议向用户确认后重新提交 |
 | 京东模式启动即退出 | 确认显式开关、数据库迁移和 Playwright Chromium 已完成 |
+| 返回 `sign_in_required` | 运行 `uv run --locked personal-shopping-agent login jd` 重新登录后重试 |
 | 京东返回验证码、403 或 429 | 停止自动访问并由用户处理；不要增加绕过逻辑 |
 | 模型解释回退到原报告 | 检查提供方、模型名、API 密钥和网络；排名不受影响 |
 | Chromium 未安装 | 只有显式配置真实采集时才需要运行 `uv run playwright install chromium` |

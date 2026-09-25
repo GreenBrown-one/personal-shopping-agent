@@ -5,7 +5,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from personal_shopping_agent.storage.tables import Base
+from personal_shopping_agent.infrastructure.storage.tables import Base
 
 config = context.config
 if config.config_file_name is not None:

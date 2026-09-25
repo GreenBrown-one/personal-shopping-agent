@@ -3,7 +3,7 @@
 import json
 from dataclasses import asdict
 
-from personal_shopping_agent.health import health_check
+from personal_shopping_agent.interfaces.health import health_check
 
 
 def main() -> None:

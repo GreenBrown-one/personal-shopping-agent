@@ -21,9 +21,9 @@ dependencies = [
 ]
 
 [project.scripts]
-personal-shopping-agent = "personal_shopping_agent.cli:main"
-personal-shopping-agent-mcp = "personal_shopping_agent.mcp.server:main"
-personal-shopping-agent-mcp-jd = "personal_shopping_agent.mcp.server:main_jd"
+personal-shopping-agent = "personal_shopping_agent.interfaces.cli:main"
+personal-shopping-agent-mcp = "personal_shopping_agent.interfaces.mcp.server:main"
+personal-shopping-agent-mcp-jd = "personal_shopping_agent.interfaces.mcp.server:main_jd"
 
 [dependency-groups]
 dev = [

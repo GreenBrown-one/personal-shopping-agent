@@ -12,6 +12,7 @@ These rules apply to every human or AI contributor.
 
 ## Architecture
 
+- Code is organized into five capability layers — `intake` (clarify needs), `sourcing` (find products), `presentation` (present candidates), `automation`, and `evolution` — plus the shared `domain`, `infrastructure`, and `interfaces` packages. Put new code in the layer whose job it is and follow the dependency direction in `DESIGN.md` section 3; `tests/unit/test_architecture.py` enforces it and must be updated when a package is added.
 - Domain code must remain independent from Playwright, MCP, SQLAlchemy, and model-provider SDKs.
 - Keep `Product` identity separate from seller/time/region-specific `Offer` data.
 - Platform adapters collect and translate data; they do not rank products.

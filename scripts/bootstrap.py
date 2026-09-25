@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
-from personal_shopping_agent.cli import main as cli_main
+from personal_shopping_agent.interfaces.cli import main as cli_main
 
 _BOOTSTRAP_COMMANDS: tuple[tuple[str, ...], ...] = (
     ("health",),

@@ -6,18 +6,18 @@ from pathlib import Path
 import pytest
 from mcp import Client
 
-from personal_shopping_agent.browser import StatusPage
-from personal_shopping_agent.mcp import (
-    create_live_jd_server,
-    create_live_jd_server_for_database,
-)
-from personal_shopping_agent.runtime_settings import (
+from personal_shopping_agent.infrastructure.settings import (
     DATABASE_URL_ENV,
     LIVE_JD_ACCESS_ENV,
     LIVE_JD_HEADLESS_ENV,
     LiveJDConfigurationError,
 )
-from personal_shopping_agent.storage import upgrade_database
+from personal_shopping_agent.infrastructure.storage import upgrade_database
+from personal_shopping_agent.interfaces.mcp import (
+    create_live_jd_server,
+    create_live_jd_server_for_database,
+)
+from personal_shopping_agent.sourcing.browser import StatusPage
 
 
 class FakeManagedCollector:
@@ -58,7 +58,7 @@ def test_live_jd_server_manages_the_collector_and_reports_honest_capabilities() 
             assert collector.started == 1
             result = await client.call_tool("shopping_agent_status", {})
             assert result.structured_content is not None
-            assert result.structured_content["milestone"] == "M7"
+            assert result.structured_content["milestone"] == "M8"
             assert result.structured_content["end_to_end_pipeline"] is True
             assert result.structured_content["platform_collection"] is True
             assert result.structured_content["automatic_purchase"] is False

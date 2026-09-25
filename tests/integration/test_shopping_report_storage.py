@@ -11,22 +11,8 @@ from pydantic import HttpUrl
 from sqlalchemy import Engine, event, func, select
 from sqlalchemy.exc import IntegrityError
 
-from personal_shopping_agent.application import (
-    CandidateDecisionInput,
-    CandidateEvidenceConfidence,
-    CandidateRankingEngine,
-    CandidateScoringFoundation,
-    CriterionEvaluation,
-    CriterionEvaluationStatus,
-    CriterionEvidenceAssessment,
-    OfferCostAssessment,
-    RenderedShoppingReport,
-    ShoppingReportNotFoundError,
-    ShoppingReportService,
+from personal_shopping_agent.automation import (
     ShoppingWorkflowService,
-    StoredShoppingReportIntegrityError,
-    WorkflowSnapshot,
-    WorkflowState,
 )
 from personal_shopping_agent.domain import (
     Budget,
@@ -41,8 +27,10 @@ from personal_shopping_agent.domain import (
     ShoppingCriterion,
     ShoppingRequest,
     StoreType,
+    WorkflowSnapshot,
+    WorkflowState,
 )
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
     SQLiteShoppingRepository,
@@ -52,9 +40,30 @@ from personal_shopping_agent.storage import (
     create_sqlite_engine,
     session_scope,
 )
-from personal_shopping_agent.storage.reporting_unit_of_work import shopping_report_record
-from personal_shopping_agent.storage.scoring_unit_of_work import candidate_score_record
-from personal_shopping_agent.storage.tables import CandidateScoreRecord, ShoppingReportRecord
+from personal_shopping_agent.infrastructure.storage.reporting_unit_of_work import (
+    shopping_report_record,
+)
+from personal_shopping_agent.infrastructure.storage.scoring_unit_of_work import (
+    candidate_score_record,
+)
+from personal_shopping_agent.infrastructure.storage.tables import (
+    CandidateScoreRecord,
+    ShoppingReportRecord,
+)
+from personal_shopping_agent.presentation import (
+    CandidateDecisionInput,
+    CandidateEvidenceConfidence,
+    CandidateRankingEngine,
+    CandidateScoringFoundation,
+    CriterionEvaluation,
+    CriterionEvaluationStatus,
+    CriterionEvidenceAssessment,
+    OfferCostAssessment,
+    RenderedShoppingReport,
+    ShoppingReportNotFoundError,
+    ShoppingReportService,
+    StoredShoppingReportIntegrityError,
+)
 
 NOW = datetime(2026, 8, 10, 3, 0, tzinfo=UTC)
 RENDERED_AT = NOW + timedelta(seconds=1)

@@ -23,7 +23,7 @@ from personal_shopping_agent.domain import (
     ShoppingRequest,
     StoreType,
 )
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     DuplicateEntityError,
     EntityNotFoundError,
     InvalidReferenceError,
@@ -33,7 +33,7 @@ from personal_shopping_agent.storage import (
     create_sqlite_engine,
     session_scope,
 )
-from personal_shopping_agent.storage.tables import ProductRecord
+from personal_shopping_agent.infrastructure.storage.tables import ProductRecord
 
 CAPTURED_AT = datetime(2026, 8, 9, 10, 0, tzinfo=UTC)
 
