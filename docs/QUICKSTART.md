@@ -60,6 +60,19 @@ uv run --locked python scripts/bootstrap.py
 {"command":"bootstrap","ok":true,"service":"personal-shopping-agent"}
 ```
 
+**同时写入 Claude Desktop（Windows / macOS）：**
+
+```bash
+uv run --locked python scripts/bootstrap.py --claude-desktop             # 默认离线模式
+uv run --locked python scripts/bootstrap.py --claude-desktop --live-jd   # 真实京东模式
+uv run --locked personal-shopping-agent install-claude-desktop --dry-run # 只预览，不写入
+```
+
+安装器只写入 Claude Desktop 配置中的 `personal-shopping-agent` 条目，其他服务器和设置保持不变；内容有变化时
+先在同目录创建 `claude_desktop_config.json.backup-<时间>` 备份再写入，已有文件损坏时拒绝修改。它使用当前
+`uv` 的绝对路径，避免 Claude Desktop 找不到 `uv`。Windows 用户也可以直接双击仓库根目录的
+`install-windows.cmd` 完成全部步骤。
+
 默认数据库位于 `data/personal-shopping-agent.db`。不要把 `data`、浏览器资料、截图、导出文件或模型密钥提交到 Git。
 
 ## 5. 启动 MCP

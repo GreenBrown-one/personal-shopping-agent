@@ -558,6 +558,15 @@ CI 的隔离 wheel 验收还必须验证新数据库的私有权限诊断。
 项目包目录的现有项目根目录，输出 `uv --directory ... run --locked` 形式的 JSON；它不读取或输出模型
 密钥、Cookie、浏览器会话或数据库内容。默认配置继续启动离线 `personal-shopping-agent-mcp`。
 
+Claude Desktop 安装器 `install-claude-desktop` 只写入宿主官方配置文件（Windows
+`%APPDATA%\Claude\claude_desktop_config.json`，macOS `~/Library/Application Support/Claude/`）中名为
+`personal-shopping-agent` 的一个 `mcpServers` 条目，其他服务器与设置原样保留。已有文件不是合法 JSON 对象或
+`mcpServers` 不是对象时拒绝写入；内容不变时不写；改写前先以独占方式创建带时间戳的完整备份，再原子替换。
+输出只包含本项目条目、状态、配置与备份路径，不回显其他服务器配置（可能含密钥）。`--dry-run` 只预览。
+`scripts/bootstrap.py --claude-desktop [--live-jd]` 在初始化成功后调用同一命令；仓库根目录的
+`install-windows.cmd` 只按顺序调用这些公开命令（uv 缺失时先征得同意再运行 uv 官方安装脚本），不包含
+其他逻辑，登录仍由用户在可见浏览器中亲自完成。
+
 MCP 还提供一个静态购物需求准备 Prompt，指导宿主先查询能力，再从自然语言中提取品类、预算、地区和
 条件；信息不足时必须追问。Prompt 只是宿主引导，不执行工具、不访问网络，也不能绕过 Pydantic 输入
 校验或工作流状态机。
