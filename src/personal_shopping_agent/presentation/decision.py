@@ -2,7 +2,6 @@
 
 from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
-from typing import cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -16,6 +15,11 @@ from personal_shopping_agent.domain import (
     ShoppingRequest,
     StoreType,
 )
+from personal_shopping_agent.domain.criteria import (
+    InvalidCriterionDefinitionError,
+    numeric_criterion_bounds,
+)
+from personal_shopping_agent.domain.measurements import specification_key_token
 from personal_shopping_agent.sourcing.normalization import (
     NormalizedSpecification,
     SpecificationNormalizationStatus,
@@ -125,7 +129,7 @@ class CandidateScoringFoundation(DecisionModel):
     def aggregate_fields_match_children(self) -> "CandidateScoringFoundation":
         """Keep utility, hard gates, and best-offer selection internally consistent."""
 
-        criterion_keys = [_key_token(item.key) for item in self.criterion_evaluations]
+        criterion_keys = [specification_key_token(item.key) for item in self.criterion_evaluations]
         if len(criterion_keys) != len(set(criterion_keys)):
             raise ValueError("criterion evaluation keys must be unique after normalization")
         if bool(self.criterion_evaluations) != (self.utility is not None):
@@ -154,65 +158,8 @@ class CandidateScoringFoundation(DecisionModel):
         return self
 
 
-class InvalidCriterionDefinitionError(ValueError):
-    """Raised when criterion bounds cannot be interpreted without guessing direction."""
-
-    def __init__(self, key: str, code: str, message: str) -> None:
-        super().__init__(message)
-        self.key = key
-        self.code = code
-
-
-def _key_token(value: str) -> str:
-    return " ".join(value.casefold().replace("_", " ").split())
-
-
 def _quantize_score(value: Decimal) -> Decimal:
     return min(_ONE, max(Decimal("0"), value)).quantize(_SCORE_QUANTUM, rounding=ROUND_HALF_UP)
-
-
-def _numeric_bounds(
-    criterion: ShoppingCriterion,
-) -> tuple[Decimal | None, Decimal | None, Decimal | None]:
-    raw_values = (criterion.minimum, criterion.preferred, criterion.maximum)
-    if any(value is not None and not isinstance(value, Decimal) for value in raw_values):
-        raise InvalidCriterionDefinitionError(
-            criterion.key,
-            "non_numeric_bound",
-            "Normalized numeric specifications require numeric criterion bounds.",
-        )
-    minimum, preferred, maximum = cast(
-        tuple[Decimal | None, Decimal | None, Decimal | None], raw_values
-    )
-    if any(value is not None and value < 0 for value in (minimum, preferred, maximum)):
-        raise InvalidCriterionDefinitionError(
-            criterion.key,
-            "negative_bound",
-            "Normalized measurement criterion bounds cannot be negative.",
-        )
-    if minimum is not None and maximum is not None and minimum > maximum:
-        raise InvalidCriterionDefinitionError(
-            criterion.key,
-            "bounds_reversed",
-            "Criterion minimum cannot exceed maximum.",
-        )
-    if preferred is not None and (
-        (minimum is not None and preferred < minimum)
-        or (maximum is not None and preferred > maximum)
-    ):
-        raise InvalidCriterionDefinitionError(
-            criterion.key,
-            "preferred_outside_bounds",
-            "Criterion preferred value must remain inside declared bounds.",
-        )
-    if minimum is None and maximum is None:
-        code = "preferred_direction_undefined" if preferred is not None else "bounds_missing"
-        raise InvalidCriterionDefinitionError(
-            criterion.key,
-            code,
-            "A numeric criterion requires a minimum or maximum to define direction.",
-        )
-    return minimum, preferred, maximum
 
 
 def _score_value(
@@ -254,7 +201,7 @@ class CriterionEvaluator:
     ) -> tuple[CriterionEvaluation, ...]:
         """Return deterministic partial scores without resolving conflicts or missing data."""
 
-        normalized_keys = [_key_token(criterion.key) for criterion in criteria]
+        normalized_keys = [specification_key_token(criterion.key) for criterion in criteria]
         if len(normalized_keys) != len(set(normalized_keys)):
             raise InvalidCriterionDefinitionError(
                 "*",
@@ -263,9 +210,13 @@ class CriterionEvaluator:
             )
         by_key: dict[str, list[NormalizedSpecification]] = {}
         for specification in specifications:
-            by_key.setdefault(_key_token(specification.canonical_key), []).append(specification)
+            by_key.setdefault(specification_key_token(specification.canonical_key), []).append(
+                specification
+            )
         return tuple(
-            self._evaluate_one(criterion, tuple(by_key.get(_key_token(criterion.key), ())))
+            self._evaluate_one(
+                criterion, tuple(by_key.get(specification_key_token(criterion.key), ()))
+            )
             for criterion in criteria
         )
 
@@ -274,7 +225,7 @@ class CriterionEvaluator:
         criterion: ShoppingCriterion,
         facts: tuple[NormalizedSpecification, ...],
     ) -> CriterionEvaluation:
-        minimum, preferred, maximum = _numeric_bounds(criterion)
+        minimum, preferred, maximum = numeric_criterion_bounds(criterion)
         if not facts:
             return CriterionEvaluation(
                 key=criterion.key,

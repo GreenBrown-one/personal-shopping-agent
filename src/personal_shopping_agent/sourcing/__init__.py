@@ -60,7 +60,6 @@ from personal_shopping_agent.sourcing.ingestion import (
     OfferIngestionUnitOfWorkFactory,
 )
 from personal_shopping_agent.sourcing.normalization import (
-    MeasurementDefinition,
     NormalizedSpecification,
     NoSpecificationsForNormalizationError,
     ProductSpecificationNormalizer,
@@ -70,8 +69,6 @@ from personal_shopping_agent.sourcing.normalization import (
     SpecificationNormalizationStatus,
     SpecificationNormalizationUnitOfWork,
     SpecificationNormalizationUnitOfWorkFactory,
-    measurement_definition,
-    normalize_measurement,
 )
 from personal_shopping_agent.sourcing.observations import (
     DetailObservation,
@@ -96,7 +93,6 @@ __all__ = [
     "EvidenceCrossCheckService",
     "EvidenceCrossCheckUnitOfWork",
     "EvidenceCrossCheckUnitOfWorkFactory",
-    "MeasurementDefinition",
     "NoCandidatesDiscoveredError",
     "NoDetailObservationsError",
     "NoProductsForEvidenceCheckError",
@@ -139,6 +135,4 @@ __all__ = [
     "SpecificationNormalizationUnitOfWork",
     "SpecificationNormalizationUnitOfWorkFactory",
     "evidence_source_for_store",
-    "measurement_definition",
-    "normalize_measurement",
 ]

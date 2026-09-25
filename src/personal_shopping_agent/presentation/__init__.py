@@ -18,7 +18,6 @@ from personal_shopping_agent.presentation.decision import (
     CriterionEvaluation,
     CriterionEvaluationStatus,
     CriterionEvaluator,
-    InvalidCriterionDefinitionError,
     OfferCostAssessment,
     OfferCostEstimator,
 )
@@ -101,7 +100,6 @@ __all__ = [
     "ExplanationFallbackReason",
     "ExplanationStatement",
     "ExplanationStatus",
-    "InvalidCriterionDefinitionError",
     "InvalidEvidenceTimelineError",
     "InvalidExplanationOutputError",
     "MarkdownShoppingReportExplanationRenderer",

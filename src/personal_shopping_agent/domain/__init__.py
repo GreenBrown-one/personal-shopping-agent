@@ -3,11 +3,24 @@
 Every capability layer depends on this package; it depends on none of them.
 """
 
+from personal_shopping_agent.domain.criteria import (
+    InvalidCriterionDefinitionError,
+    numeric_criterion_bounds,
+)
 from personal_shopping_agent.domain.enums import (
     EvidenceSourceType,
     EvidenceSubjectType,
     PriceKind,
     StoreType,
+)
+from personal_shopping_agent.domain.measurements import (
+    MEASUREMENT_DEFINITIONS,
+    MeasurementDefinition,
+    is_declared_unit,
+    measurement_definition,
+    measurement_for_criterion_key,
+    normalize_measurement,
+    specification_key_token,
 )
 from personal_shopping_agent.domain.models import (
     Budget,
@@ -31,12 +44,15 @@ from personal_shopping_agent.domain.workflow import (
 )
 
 __all__ = [
+    "MEASUREMENT_DEFINITIONS",
     "Budget",
     "Evidence",
     "EvidenceSourceType",
     "EvidenceSubjectType",
+    "InvalidCriterionDefinitionError",
     "InvalidWorkflowTransitionError",
     "JsonContractModel",
+    "MeasurementDefinition",
     "Money",
     "Offer",
     "PriceBreakdown",
@@ -51,4 +67,10 @@ __all__ = [
     "WorkflowSnapshot",
     "WorkflowState",
     "WorkflowStateMachine",
+    "is_declared_unit",
+    "measurement_definition",
+    "measurement_for_criterion_key",
+    "normalize_measurement",
+    "numeric_criterion_bounds",
+    "specification_key_token",
 ]

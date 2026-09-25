@@ -9,6 +9,7 @@ from pydantic import HttpUrl, ValidationError
 
 from personal_shopping_agent.domain import (
     Budget,
+    InvalidCriterionDefinitionError,
     Money,
     Offer,
     PriceBreakdown,
@@ -24,7 +25,6 @@ from personal_shopping_agent.presentation import (
     CriterionEvaluation,
     CriterionEvaluationStatus,
     CriterionEvaluator,
-    InvalidCriterionDefinitionError,
     OfferCostAssessment,
     OfferCostEstimator,
 )

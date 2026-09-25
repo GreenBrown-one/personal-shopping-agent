@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from personal_shopping_agent.domain import Evidence, Money, Offer, Product, ShoppingRequest
+from personal_shopping_agent.domain.measurements import specification_key_token
 from personal_shopping_agent.domain.workflow import (
     InvalidWorkflowTransitionError,
     ShoppingWorkflow,
@@ -237,10 +238,6 @@ def _nonnegative_score(value: Decimal) -> Decimal:
     return max(_ZERO, value).quantize(_SCORE_QUANTUM, rounding=ROUND_HALF_UP)
 
 
-def _key_token(value: str) -> str:
-    return " ".join(value.casefold().replace("_", " ").split())
-
-
 def _best_offer(foundation: CandidateScoringFoundation) -> OfferCostAssessment | None:
     if foundation.best_offer_id is None:
         return None
@@ -422,11 +419,12 @@ class CandidateRankingEngine:
         if any(item.foundation.request_id != request.id for item in candidates):
             raise ValueError("Every ranking candidate must belong to the shopping request.")
         expected_criteria = tuple(
-            (_key_token(item.key), item.weight, item.hard_requirement) for item in request.criteria
+            (specification_key_token(item.key), item.weight, item.hard_requirement)
+            for item in request.criteria
         )
         if any(
             tuple(
-                (_key_token(item.key), item.weight, item.hard_requirement)
+                (specification_key_token(item.key), item.weight, item.hard_requirement)
                 for item in candidate.foundation.criterion_evaluations
             )
             != expected_criteria

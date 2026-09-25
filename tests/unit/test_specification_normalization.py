@@ -22,6 +22,8 @@ from personal_shopping_agent.domain import (
     WorkflowSnapshot,
     WorkflowState,
     WorkflowStateMachine,
+    measurement_definition,
+    normalize_measurement,
 )
 from personal_shopping_agent.sourcing import (
     NormalizedSpecification,
@@ -29,8 +31,6 @@ from personal_shopping_agent.sourcing import (
     ProductSpecificationNormalizer,
     SpecificationNormalizationService,
     SpecificationNormalizationStatus,
-    measurement_definition,
-    normalize_measurement,
 )
 
 NOW = datetime(2026, 8, 9, 21, 0, tzinfo=UTC)

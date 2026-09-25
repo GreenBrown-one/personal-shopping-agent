@@ -12,6 +12,7 @@ from personal_shopping_agent.domain import (
     EvidenceSubjectType,
     ShoppingRequest,
 )
+from personal_shopping_agent.domain.measurements import specification_key_token
 from personal_shopping_agent.presentation.decision import (
     CandidateScoringFoundation,
     CriterionEvaluation,
@@ -102,7 +103,7 @@ class CandidateEvidenceConfidence(ConfidenceModel):
     def aggregates_are_consistent(self) -> "CandidateEvidenceConfidence":
         """Reject duplicate criteria or aggregate values that disagree with formulas."""
 
-        keys = [_key_token(item.key) for item in self.criteria]
+        keys = [specification_key_token(item.key) for item in self.criteria]
         if len(keys) != len(set(keys)):
             raise ValueError("criterion confidence keys must be unique after normalization")
         if bool(self.criteria) != (self.base_utility is not None):
@@ -157,10 +158,6 @@ class InvalidEvidenceTimelineError(ValueError):
         super().__init__(message)
         self.record_id = record_id
         self.code = code
-
-
-def _key_token(value: str) -> str:
-    return " ".join(value.casefold().replace("_", " ").split())
 
 
 def _quantize(value: Decimal) -> Decimal:
@@ -268,10 +265,11 @@ class EvidenceConfidenceEvaluator:
                 "Candidate scoring foundation must belong to the shopping request.",
             )
         expected = tuple(
-            (_key_token(item.key), item.weight, item.hard_requirement) for item in request.criteria
+            (specification_key_token(item.key), item.weight, item.hard_requirement)
+            for item in request.criteria
         )
         actual = tuple(
-            (_key_token(item.key), item.weight, item.hard_requirement)
+            (specification_key_token(item.key), item.weight, item.hard_requirement)
             for item in foundation.criterion_evaluations
         )
         if expected != actual:
@@ -310,7 +308,8 @@ class EvidenceConfidenceEvaluator:
                 tuple(
                     item
                     for item in scoped_specifications
-                    if _key_token(item.canonical_key) == _key_token(evaluation.key)
+                    if specification_key_token(item.canonical_key)
+                    == specification_key_token(evaluation.key)
                 ),
                 scoped_evidence,
                 scoped_checks,
