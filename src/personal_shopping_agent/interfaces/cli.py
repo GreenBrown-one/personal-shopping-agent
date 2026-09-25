@@ -1,4 +1,4 @@
-"""Safe local administration CLI for health and packaged database migrations."""
+"""Safe local administration CLI: health, migrations, data lifecycle, and improvement cases."""
 
 import argparse
 import json
@@ -18,6 +18,7 @@ from personal_shopping_agent.automation import (
     WorkflowDeletionConfirmationError,
     WorkflowDeletionPlanStaleError,
 )
+from personal_shopping_agent.evolution import ImprovementCaseBuilder, is_stable_code
 from personal_shopping_agent.infrastructure.settings import database_url_from_environment
 from personal_shopping_agent.infrastructure.storage import (
     DatabaseMigrationError,
@@ -26,6 +27,7 @@ from personal_shopping_agent.infrastructure.storage import (
     EntityNotFoundError,
     LocalJsonWorkflowArchiveWriter,
     SQLiteWorkflowDataStore,
+    SQLiteWorkflowRepository,
     create_session_factory,
     create_sqlite_engine,
     inspect_database_migrations,
@@ -83,7 +85,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     delete_parser.add_argument("workflow_id")
     delete_parser.add_argument("--confirm")
-    for data_command_parser in (export_parser, delete_parser):
+    improvement_parser = commands.add_parser(
+        "improvement-case",
+        help="print a local sanitized improvement case preview; nothing is uploaded",
+    )
+    improvement_parser.add_argument("workflow_id")
+    improvement_parser.add_argument(
+        "--error-code",
+        help="stable error code the user saw, e.g. platform_access_restricted",
+    )
+    for data_command_parser in (export_parser, delete_parser, improvement_parser):
         data_command_parser.add_argument(
             "--database-url",
             help="local SQLite URL; defaults to PERSONAL_SHOPPING_DATABASE_URL",
@@ -277,6 +288,82 @@ def _run_data_command(
             engine.dispose()
 
 
+def _run_improvement_case(
+    namespace: argparse.Namespace,
+    *,
+    environment: Mapping[str, str] | None,
+) -> int:
+    command = "improvement_case"
+    try:
+        workflow_id = UUID(cast(str, namespace.workflow_id))
+    except ValueError:
+        _emit_data_error(
+            "invalid_workflow_id",
+            "Workflow ID must be a valid UUID.",
+            command=command,
+        )
+        return 2
+    reported_error_code = cast(str | None, namespace.error_code)
+    if reported_error_code is not None and not is_stable_code(reported_error_code):
+        _emit_data_error(
+            "invalid_error_code",
+            "Error codes may contain only lowercase letters, digits, and _.:-",
+            command=command,
+        )
+        return 2
+
+    explicit_database_url = cast(str | None, namespace.database_url)
+    database_url = explicit_database_url or database_url_from_environment(environment)
+    try:
+        require_current_database(database_url)
+    except ValueError:
+        _emit_data_error(
+            "invalid_database_url",
+            "Only a valid local SQLite database URL is supported.",
+            command=command,
+        )
+        return 2
+    except DatabaseSchemaNotReadyError:
+        _emit_data_error(
+            "database_not_ready",
+            "Run `personal-shopping-agent migrate` before building an improvement case.",
+            command=command,
+        )
+        return 1
+    except DatabaseMigrationError:
+        _emit_data_error(
+            "database_operation_failed",
+            "The local database operation failed.",
+            command=command,
+        )
+        return 2
+
+    engine = create_sqlite_engine(database_url)
+    try:
+        snapshot = SQLiteWorkflowRepository(create_session_factory(engine)).get_snapshot(
+            workflow_id
+        )
+    except EntityNotFoundError:
+        _emit_data_error(
+            "workflow_not_found",
+            "The local shopping workflow was not found.",
+            command=command,
+        )
+        return 1
+    except SQLAlchemyError:
+        _emit_data_error(
+            "database_operation_failed",
+            "The local database operation failed.",
+            command=command,
+        )
+        return 2
+    finally:
+        engine.dispose()
+    case = ImprovementCaseBuilder().build(snapshot, reported_error_code=reported_error_code)
+    _emit({"case": case.model_dump(mode="json"), "command": command, "ok": True})
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -302,6 +389,9 @@ def main(
 
     if command_name == "data":
         return _run_data_command(namespace, environment=environment)
+
+    if command_name == "improvement-case":
+        return _run_improvement_case(namespace, environment=environment)
 
     explicit_database_url = cast(str | None, namespace.database_url)
     database_url = explicit_database_url or database_url_from_environment(environment)
