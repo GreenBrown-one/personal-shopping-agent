@@ -42,7 +42,14 @@ class CriterionInput(MCPModel):
 class StartShoppingWorkflowInput(MCPModel):
     """Minimal structured input the AI derives from the user's shopping request."""
 
-    query: str = Field(min_length=1, max_length=2_000)
+    query: str = Field(
+        min_length=1,
+        max_length=2_000,
+        description=(
+            "Short shopping-platform search keywords, sent verbatim to the platform search box "
+            "(for example '大电池手机'). Keep preferences and constraints out of this field."
+        ),
+    )
     category: str = Field(min_length=1, max_length=160)
     budget_maximum: Decimal = Field(gt=0)
     budget_currency: str = Field(default="CNY", min_length=3, max_length=3)

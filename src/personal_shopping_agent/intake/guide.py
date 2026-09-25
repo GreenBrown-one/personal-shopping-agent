@@ -4,6 +4,7 @@ SHOPPING_REQUEST_GUIDE = """Prepare one shopping request from the user's own wor
 
 First call shopping_agent_status and do not assume unavailable capabilities exist. Identify the
 product category, normal budget, optional stretch budget, currency, region, and explicit criteria.
+The query field is sent verbatim to the platform search box, so keep it to a few search keywords.
 Then call review_shopping_request with the draft. For every blocking issue ask the user one concise
 follow-up based on its suggestion; relay warnings when they change what the report can show. Never
 fill in a bound, unit, or key the user did not confirm. Preserve uncertainty instead of inventing
