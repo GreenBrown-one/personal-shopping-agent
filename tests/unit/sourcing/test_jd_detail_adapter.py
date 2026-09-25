@@ -112,7 +112,16 @@ def test_detail_parser_keeps_missing_commercial_fields_unknown_and_marks_off_she
     assert result.specifications == ()
 
 
-@pytest.mark.parametrize("marker", ["请输入验证码", "安全验证", "访问过于频繁", "CAPTCHA"])
+@pytest.mark.parametrize(
+    "marker",
+    [
+        "请输入验证码",
+        "安全验证",
+        "访问过于频繁",
+        "抱歉由于访问频繁导致无法搜索",
+        "CAPTCHA",
+    ],
+)
 def test_detail_parser_stops_for_human_verification(marker: str) -> None:
     with pytest.raises(PlatformAccessRestrictedError) as captured:
         JDDetailAdapter().parse_detail(

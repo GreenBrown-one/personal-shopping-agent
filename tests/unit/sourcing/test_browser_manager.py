@@ -587,3 +587,28 @@ def test_redirect_to_a_sign_in_host_stops_with_an_actionable_code(tmp_path: Path
         await manager.close()
 
     run(scenario())
+
+
+def test_script_redirect_to_sign_in_after_load_is_not_masked_by_the_error_page(
+    tmp_path: Path,
+) -> None:
+    manager, page, context, _chromium, _playwright = make_manager(tmp_path)
+
+    async def load_then_redirect_to_sign_in() -> None:
+        handler = cast(Callable[[Any, Any], Awaitable[None]], context.route_handler)
+        await handler(
+            cast(Any, FakeRoute()),
+            cast(Any, FakeRequest("https://login.shop.example/new/login.aspx")),
+        )
+        page.url = "chrome-error://chromewebdata/"
+
+    page.goto_hook = load_then_redirect_to_sign_in
+
+    async def scenario() -> None:
+        await manager.start()
+        with pytest.raises(NavigationPolicyError) as captured:
+            await manager.open("https://shop.example/products")
+        assert captured.value.code == "sign_in_required"
+        await manager.close()
+
+    run(scenario())

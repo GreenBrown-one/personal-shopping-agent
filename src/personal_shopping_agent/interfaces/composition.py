@@ -39,19 +39,21 @@ from personal_shopping_agent.sourcing.platforms.jd import (
     JD_HOME_HOST,
     JD_ITEM_HOST,
     JD_SEARCH_HOST,
+    JD_SECURITY_CHECK_HOST,
     JD_SIGN_IN_HOST,
+    JD_SIGN_IN_SUBRESOURCE_DOMAINS,
     JD_SUBRESOURCE_DOMAINS,
 )
 from personal_shopping_agent.sourcing.platforms.socpk import SOCPK_DOMAIN, SOCPK_HOST
 
 
 def create_jd_collection_policy() -> NavigationPolicy:
-    """Pages: exact search/item hosts. Resources: JD's own domains. Login redirects stop."""
+    """Pages: exact search/item hosts. Resources: JD's own domains. Login/verification stop."""
 
     return NavigationPolicy(
         (JD_SEARCH_HOST, JD_ITEM_HOST),
         subresource_domains=JD_SUBRESOURCE_DOMAINS,
-        sign_in_hosts=(JD_SIGN_IN_HOST,),
+        sign_in_hosts=(JD_SIGN_IN_HOST, JD_SECURITY_CHECK_HOST),
     )
 
 
@@ -59,8 +61,8 @@ def create_jd_sign_in_policy() -> NavigationPolicy:
     """Allow the user-driven sign-in page and JD's own post-login landing pages only."""
 
     return NavigationPolicy(
-        (JD_SIGN_IN_HOST, JD_HOME_HOST, JD_SEARCH_HOST, JD_ITEM_HOST),
-        subresource_domains=JD_SUBRESOURCE_DOMAINS,
+        (JD_SIGN_IN_HOST, JD_SECURITY_CHECK_HOST, JD_HOME_HOST, JD_SEARCH_HOST, JD_ITEM_HOST),
+        subresource_domains=JD_SIGN_IN_SUBRESOURCE_DOMAINS,
     )
 
 
