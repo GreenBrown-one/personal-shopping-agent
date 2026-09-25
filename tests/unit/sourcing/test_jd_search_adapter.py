@@ -87,7 +87,16 @@ def test_parse_search_requires_the_jd_search_host() -> None:
         )
 
 
-@pytest.mark.parametrize("marker", ["请输入验证码", "安全验证", "访问过于频繁", "CAPTCHA"])
+@pytest.mark.parametrize(
+    "marker",
+    [
+        "请输入验证码",
+        "安全验证",
+        "访问过于频繁",
+        "抱歉由于访问频繁导致无法搜索",
+        "CAPTCHA",
+    ],
+)
 def test_parse_search_stops_on_human_verification(marker: str) -> None:
     with pytest.raises(PlatformAccessRestrictedError) as captured:
         JDSearchAdapter().parse_search(

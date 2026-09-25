@@ -1,5 +1,6 @@
 """Secret-free generic MCP host configuration tests."""
 
+import asyncio
 from pathlib import Path
 from typing import cast
 
@@ -14,6 +15,7 @@ from personal_shopping_agent.interfaces.host_config import (
     SourceCheckoutError,
     build_source_mcp_configuration,
 )
+from personal_shopping_agent.sourcing.browser import NavigationPolicyError
 
 
 def _checkout(tmp_path: Path) -> Path:
@@ -79,7 +81,33 @@ def test_jd_policies_separate_collection_pages_from_the_sign_in_flow() -> None:
     assert collection.allowed_hosts == {"search.jd.com", "item.jd.com"}
     assert sign_in.allowed_hosts == {
         "passport.jd.com",
+        "aq.jd.com",
         "www.jd.com",
         "search.jd.com",
         "item.jd.com",
     }
+
+
+async def public_resolver(_hostname: str, _port: int) -> tuple[str, ...]:
+    return ("8.8.8.8",)
+
+
+def test_jd_security_check_is_a_user_step_never_a_collection_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        collection = create_jd_collection_policy()
+        sign_in = create_jd_sign_in_policy()
+        for policy in (collection, sign_in):
+            monkeypatch.setattr(policy, "_resolver", public_resolver)  # offline: no real DNS
+        with pytest.raises(NavigationPolicyError) as captured:
+            await collection.validate("https://aq.jd.com/verify")
+        assert captured.value.code == "sign_in_required"
+        await sign_in.validate("https://aq.jd.com/verify")
+        await sign_in.validate_subresource("https://jrsecstatic.jdpay.com/risk.js")
+        with pytest.raises(NavigationPolicyError):
+            await collection.validate_subresource("https://jrsecstatic.jdpay.com/risk.js")
+        with pytest.raises(NavigationPolicyError):
+            await sign_in.validate_subresource("https://sso.jd.hk/setCookie")
+
+    asyncio.run(scenario())

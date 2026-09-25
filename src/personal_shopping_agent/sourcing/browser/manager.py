@@ -202,6 +202,11 @@ class BrowserManager:
                     await page.wait_for_load_state(
                         "networkidle", timeout=self._settings.settle_timeout_ms
                     )
+            if self._last_violation is not None:
+                # A script-driven top-level redirect (e.g. to a sign-in page) was blocked after
+                # the first document loaded; the page now shows a browser error document whose
+                # non-HTTPS URL would otherwise hide the real, actionable reason.
+                raise self._last_violation
             await self._policy.validate(page.url)
             html = await page.content()
             if len(html.encode("utf-8")) > self._settings.maximum_html_bytes:

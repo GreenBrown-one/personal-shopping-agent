@@ -25,7 +25,7 @@ from personal_shopping_agent.sourcing.platforms.jd import (
 
 _PRICE_PATTERN = re.compile(r"\d[\d,]*(?:\.\d{1,2})?")
 _FULLWIDTH_COLON = "\uff1a"
-_RESTRICTION_MARKERS = ("请输入验证码", "安全验证", "访问过于频繁", "captcha")
+_RESTRICTION_MARKERS = ("请输入验证码", "安全验证", "访问过于频繁", "访问频繁", "captcha")
 _OFF_SHELF_MARKERS = ("该商品已下柜", "商品已下架")
 
 

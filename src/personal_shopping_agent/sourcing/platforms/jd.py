@@ -22,12 +22,20 @@ JD_SIGN_IN_URL = f"https://{JD_SIGN_IN_HOST}/new/login.aspx"
 JD_HOME_HOST = "www.jd.com"
 # Registrable domains JD pages load their own scripts, styles, images, and price data from.
 JD_SUBRESOURCE_DOMAINS = ("jd.com", "360buyimg.com", "3.cn")
+# JD's account-security page. After a password or QR sign-in JD may send the user here for a
+# human verification step (SMS, slider); blocking it leaves the login window on an error page.
+JD_SECURITY_CHECK_HOST = "aq.jd.com"
+# The sign-in page's own risk-control script is served from JD's payment domain. It is needed only
+# while the user signs in themselves, so collection never loads it.
+JD_SIGN_IN_SUBRESOURCE_DOMAINS = (*JD_SUBRESOURCE_DOMAINS, "jdpay.com")
 _SKU_PATTERN = re.compile(r"\d{1,32}")
 _PRICE_PATTERN = re.compile(r"\d[\d,]*(?:\.\d{1,2})?")
 _RESTRICTION_MARKERS = (
     "请输入验证码",
     "安全验证",
     "访问过于频繁",
+    # 2026 search page: "抱歉由于访问频繁导致无法搜索" rendered in place of results.
+    "访问频繁",
     "captcha",
 )
 
