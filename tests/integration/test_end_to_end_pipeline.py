@@ -382,8 +382,8 @@ def test_chip_benchmark_evidence_flows_into_normalization_ranking_and_report(
     create_schema(setup_engine)
     setup_engine.dispose()
     reference = ChipBenchmarkReference(
-        source_url=HttpUrl("https://www.socpk.com/allperf/?brand=phone"),
-        source_title="极客湾 SOCPK 手机/平板芯片综合性能排行",
+        source_url=HttpUrl("https://www.socpk.com/chart/chip-overall"),
+        source_title="极客湾 SOCPK 手机芯片综合性能排行（历史项目）",
         method="synthetic test reference",
         captured_at=datetime(2026, 1, 1, tzinfo=UTC),
         entries=(

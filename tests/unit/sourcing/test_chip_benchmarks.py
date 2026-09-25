@@ -30,12 +30,13 @@ from personal_shopping_agent.sourcing.browser import BrowserSnapshot
 from personal_shopping_agent.sourcing.platforms.socpk import (
     SOCPK_DEFAULT_METHOD,
     SOCPK_OVERALL_URL,
+    SOCPK_SOURCE_TITLE,
     BenchmarkPageParseError,
     SocpkRankingParser,
 )
 
 CAPTURED_AT = datetime(2026, 9, 1, tzinfo=UTC)
-FIXTURE = Path(__file__).parents[2] / "fixtures" / "socpk" / "allperf_rendered.html"
+FIXTURE = Path(__file__).parents[2] / "fixtures" / "socpk" / "chip_overall_rendered.html"
 
 
 def reference(*entries: tuple[str, str]) -> ChipBenchmarkReference:
@@ -206,26 +207,38 @@ def test_parser_reads_every_rendered_row_and_the_published_method() -> None:
     parsed = SocpkRankingParser().parse(snapshot(FIXTURE.read_text(encoding="utf-8")))
 
     assert len(parsed.entries) == 22
-    assert parsed.entries[0] == ChipBenchmarkEntry(name="骁龙 8 Elite Gen5", score=Decimal("420.0"))
-    assert "CPU权重70%" in parsed.method
+    assert parsed.entries[0] == ChipBenchmarkEntry(name="M4 (4+6)", score=Decimal("450.0"))
+    assert parsed.entries[-1].name == "BCM2711(树莓派4B)"
+    assert parsed.method.startswith("CPU权重70%")
+    assert parsed.source_title == SOCPK_SOURCE_TITLE
     assert parsed.captured_at == CAPTURED_AT
     assert parsed.lookup("第三代骁龙8") is not None
     assert parsed.lookup("天玑6080") is not None
+    assert parsed.lookup("天玑8400-Max") is not None
+    assert parsed.lookup("M4") is None  # two configurations with different scores
 
 
-def _table(rows: list[tuple[str, str]], *, notice: bool = True) -> str:
+def _chart(
+    rows: list[tuple[str, str]], *, method: bool = True, title: str = "手机芯片综合性能排行"
+) -> str:
     body = "".join(
-        f'<tr><td class="socName">{name}</td><td class="logo"></td>'
-        f'<td><div class="ratio"><a>{score}</a></div></td></tr>'
-        for name, score in rows
+        f'<div class="bar-row"><span class="rank-cell rank">{rank}</span>'
+        f'<span class="name-cell"><span class="bar-name">{name}</span><!----></span>'
+        f'<div class="bar-track"><div class="bar-fill"></div>'
+        f'<span class="bar-value outside">{score}</span></div></div>'
+        for rank, (name, score) in enumerate(rows, 1)
     )
-    head = '<p id="notice">方法说明</p>' if notice else ""
-    return f"<html><body>{head}<table>{body}</table></body></html>"
+    subtitle = '<p class="page-subtitle">方法说明</p>' if method else ""
+    return (
+        f'<html><body><h1 class="page-title">{title}</h1>{subtitle}'
+        f'<div class="bar-chart"><div class="rows">{body}</div></div>'
+        '<div class="bar-row"><span class="bar-name">无分数</span></div></body></html>'
+    )
 
 
 def test_parser_accepts_repeated_identical_rows_and_defaults_the_method() -> None:
     rows = [(f"芯片 {index}", f"{index + 1}.0") for index in range(20)]
-    parsed = SocpkRankingParser().parse(snapshot(_table([*rows, rows[0]], notice=False)))
+    parsed = SocpkRankingParser().parse(snapshot(_chart([*rows, rows[0]], method=False)))
 
     assert len(parsed.entries) == 20
     assert parsed.method == SOCPK_DEFAULT_METHOD
@@ -234,10 +247,17 @@ def test_parser_accepts_repeated_identical_rows_and_defaults_the_method() -> Non
 @pytest.mark.parametrize(
     ("html", "url", "message"),
     [
-        ("<html></html>", "https://example.com/allperf/", "socpk.com"),
-        (_table([("芯片 A", "fast")]), SOCPK_OVERALL_URL, "non-numeric"),
-        (_table([("芯片 A", "1"), ("芯片 A", "2")]), SOCPK_OVERALL_URL, "twice"),
-        (_table([("芯片 A", "1")]), SOCPK_OVERALL_URL, "did not render completely"),
+        ("<html></html>", "https://example.com/chart/chip-overall", "socpk.com"),
+        (
+            _chart([(f"芯片 {index}", "1") for index in range(20)], title="手机芯片 CPU 性能排行"),
+            SOCPK_OVERALL_URL,
+            "not the composite",
+        ),
+        ("<html>layout changed</html>", SOCPK_OVERALL_URL, "not the composite"),
+        (_chart([("芯片 A", "fast")]), SOCPK_OVERALL_URL, "invalid"),
+        (_chart([("芯片 A", "0")]), SOCPK_OVERALL_URL, "invalid"),
+        (_chart([("芯片 A", "1"), ("芯片 A", "2")]), SOCPK_OVERALL_URL, "twice"),
+        (_chart([("芯片 A", "1")]), SOCPK_OVERALL_URL, "did not render completely"),
     ],
 )
 def test_parser_rejects_foreign_partial_or_inconsistent_pages(

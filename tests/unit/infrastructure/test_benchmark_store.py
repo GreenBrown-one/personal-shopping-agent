@@ -17,7 +17,7 @@ from personal_shopping_agent.infrastructure.local_security import LocalFileSecur
 from personal_shopping_agent.sourcing import ChipBenchmarkEntry, ChipBenchmarkReference
 
 REFERENCE = ChipBenchmarkReference(
-    source_url=HttpUrl("https://www.socpk.com/allperf/?brand=phone"),
+    source_url=HttpUrl("https://www.socpk.com/chart/chip-overall"),
     source_title="极客湾 SOCPK",
     method="CPU 70% / GPU 30%",
     captured_at=datetime(2026, 9, 1, tzinfo=UTC),

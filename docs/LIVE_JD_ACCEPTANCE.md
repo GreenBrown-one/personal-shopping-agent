@@ -17,7 +17,7 @@
 | `run_shopping_pipeline`（未登录） | 修复前返回 `Only HTTPS navigation is allowed.`；修复后返回 `sign_in_required` |
 | `login jd` | 修复前登录窗口显示“当前页面异常”；修复后可完成登录并跳转到 `www.jd.com`，但登录页仍可能短暂显示该提示 |
 | `run_shopping_pipeline`（已登录） | 搜索页被京东风控拦截：页面显示“抱歉由于访问频繁导致无法搜索”，没有任何商品卡片 |
-| `benchmark refresh` | `benchmark_page_unrecognized` |
+| `benchmark refresh` | 修复前返回 `benchmark_page_unrecognized`；修复后成功（见已修复第 4 项） |
 
 ### 已修复
 
@@ -29,6 +29,21 @@
    `sign_in_required` 停止。
 3. **未识别新版风控文案。** 2026 版搜索页用“访问频繁导致无法搜索”代替结果列表，旧标记“访问过于频繁”
    不能匹配，导致误报“没有候选”。现已加入“访问频繁”标记，真实页面离线重放返回 `jd_access_restricted`。
+4. **SOCPK 排行页迁移。** 旧地址 `https://www.socpk.com/allperf/?brand=phone` 跳转到首页；`/category/mobile-soc`
+   只有 CPU/GPU 能效曲线，没有综合分。综合排行现位于“历史项目”分类下的
+   `https://www.socpk.com/chart/chip-overall`（页面标题“手机芯片综合性能排行”，方法说明仍为 CPU 权重 70%、
+   GPU 权重 30%，以骁龙 865 为基准）。该榜单不只收录手机，还包含 iPad M 系列、Switch Tegra、树莓派等芯片；
+   页面资源只来自 `www.socpk.com`。页面改为 Vue 渲染的条形图（`.bar-row` 内的 `.bar-name` 与
+   `.bar-value`），解析器已按新结构重写，并要求标题含“综合性能排行”，避免把结构相同的 CPU/GPU 分项排行
+   误存为综合分。修复后真实运行：
+
+   | 步骤 | 结果 |
+   |---|---|
+   | `benchmark refresh` | 成功，158 个芯片，`source_url` 为新地址，方法说明取自页面 |
+   | `benchmark show --filter 骁龙8` | 21 个骁龙 8 系列条目 |
+   | 重启后 `shopping_agent_status` | `chip_benchmark=true` |
+
+   同名多配置条目（如 `M4 (4+6)` 与 `M4 (3+6)`）分数不同，按精确匹配规则不会为“M4”生成证据。
 
 ### 未解决
 
@@ -39,10 +54,8 @@
    - 京东开放平台等官方接口（需申请权限）。
 2. **登录跨站同步仍被拦截。** `sso.jd.hk`、`sso.jdcloud.com` 等十余个关联站点的登录同步请求被拦截，
    可能导致登录页短暂显示“当前页面异常”；主站登录不受影响。登录页还会探测 `127.0.0.1`，应继续拦截。
-3. **SOCPK 排行页已下线。** `https://www.socpk.com/allperf/?brand=phone` 现跳转到首页，站点改为按类别
-   展示（如 `/category/mobile-soc`），芯片性能评分需要重新选择数据源并重写解析器。
-4. **MCP 工具错误丢失稳定错误码。** 管线异常只以英文消息返回给宿主，工作流 `error_code` 保持为空，
+3. **MCP 工具错误丢失稳定错误码。** 管线异常只以英文消息返回给宿主，工作流 `error_code` 保持为空，
    `improvement-case` 只能由调用方猜测错误码。
-5. **新版搜索页结构尚无 fixture。** 搜索页已改为 React/Vite 单页应用（`#searchCenter`、带哈希后缀的
+4. **新版搜索页结构尚无 fixture。** 搜索页已改为 React/Vite 单页应用（`#searchCenter`、带哈希后缀的
    CSS Module 类名），本次页面中没有旧解析器依赖的 `gl-item`、`p-name`、`p-price`。由于结果区被风控
    提示替代，尚不能确认正常结果卡片的结构；预计搜索解析器需要基于新版脱敏 fixture 重写。

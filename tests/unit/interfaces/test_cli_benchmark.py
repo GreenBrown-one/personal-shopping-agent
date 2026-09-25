@@ -18,7 +18,7 @@ from personal_shopping_agent.sourcing.browser import (
 )
 from personal_shopping_agent.sourcing.platforms.socpk import SOCPK_OVERALL_URL
 
-FIXTURE = Path(__file__).parents[2] / "fixtures" / "socpk" / "allperf_rendered.html"
+FIXTURE = Path(__file__).parents[2] / "fixtures" / "socpk" / "chip_overall_rendered.html"
 
 
 class FakeBenchmarkBrowser:
@@ -75,7 +75,7 @@ def test_refresh_saves_privately_then_show_lists_scores_and_a_suggestion(
     assert refreshed["suggested_criterion"] == {
         "key": "chip_performance",
         "minimum": "100",
-        "preferred": "420.0",
+        "preferred": "450.0",
         "unit": "SOCPK",
     }
 
