@@ -14,7 +14,7 @@ from personal_shopping_agent.sourcing import (
 from personal_shopping_agent.sourcing.platforms import JDDetailAdapter
 
 CAPTURED_AT = datetime(2026, 8, 9, 14, 0, tzinfo=UTC)
-FIXTURE_PATH = Path(__file__).parents[1] / "fixtures" / "jd" / "product_detail.html"
+FIXTURE_PATH = Path(__file__).parents[2] / "fixtures" / "jd" / "product_detail.html"
 
 
 def jd_candidate(*, platform: str = "jd") -> PlatformCandidate:

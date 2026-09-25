@@ -12,7 +12,7 @@ from personal_shopping_agent.sourcing import (
 from personal_shopping_agent.sourcing.platforms import JDSearchAdapter
 
 CAPTURED_AT = datetime(2026, 8, 9, 13, 0, tzinfo=UTC)
-FIXTURE_PATH = Path(__file__).parents[1] / "fixtures" / "jd" / "search_results.html"
+FIXTURE_PATH = Path(__file__).parents[2] / "fixtures" / "jd" / "search_results.html"
 
 
 class FixturePage:
