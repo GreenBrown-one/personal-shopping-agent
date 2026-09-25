@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -18,6 +19,10 @@ from personal_shopping_agent.automation import (
     ShoppingWorkflowService,
 )
 from personal_shopping_agent.domain import (
+    Budget,
+    Money,
+    ShoppingCriterion,
+    ShoppingRequest,
     WorkflowSnapshot,
     WorkflowState,
 )
@@ -99,7 +104,7 @@ def test_explicit_jd_pipeline_runs_resumes_and_keeps_mcp_boundaries(tmp_path: Pa
 
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
-            assert status.structured_content["milestone"] == "M7"
+            assert status.structured_content["milestone"] == "M8"
             assert status.structured_content["end_to_end_pipeline"] is True
             assert status.structured_content["platform_collection"] is True
             assert status.structured_content["ranking"] is True
@@ -235,3 +240,46 @@ def test_explicit_jd_pipeline_runs_resumes_and_keeps_mcp_boundaries(tmp_path: Pa
             assert "cannot enter" in failed_run.content[0].text
 
     asyncio.run(scenario())
+
+
+def test_pipeline_stops_before_platform_access_when_stored_request_is_unclear(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'unclear.db'}"
+    engine = create_sqlite_engine(database_url)
+    create_schema(engine)
+    workflow_service = ShoppingWorkflowService(
+        SQLiteWorkflowRepository(create_session_factory(engine))
+    )
+    unclear = workflow_service.start(
+        ShoppingRequest(
+            query="stored before intake review existed",
+            category="smartphone",
+            budget=Budget(maximum=Money(amount=Decimal("5000"))),
+            criteria=(ShoppingCriterion(key="battery_capacity", unit="mAh"),),
+        )
+    )
+    collector = FixtureJDPageCollector()
+    server = create_jd_pipeline_server_for_database(
+        database_url,
+        collector,
+        NoOfficialEvidenceProvider(),
+        environment={},
+    )
+
+    async def scenario() -> None:
+        async with Client(server, raise_exceptions=True) as client:
+            result = await client.call_tool(
+                "run_shopping_pipeline",
+                {"request": {"workflow_id": str(unclear.workflow.id)}},
+            )
+            assert result.is_error is True
+            assert isinstance(result.content[0], TextContent)
+            assert "battery_capacity: bounds_missing" in result.content[0].text
+
+    asyncio.run(scenario())
+    assert collector.calls == []
+    assert workflow_service.get(unclear.workflow.id).workflow.state is (
+        WorkflowState.REQUEST_VALIDATED
+    )
+    engine.dispose()

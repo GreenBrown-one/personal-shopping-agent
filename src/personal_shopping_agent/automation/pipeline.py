@@ -8,6 +8,7 @@ from pydantic import ConfigDict, Field, model_validator
 from personal_shopping_agent.automation.workflow_service import ShoppingWorkflowService
 from personal_shopping_agent.domain.serialization import JsonContractModel
 from personal_shopping_agent.domain.workflow import WorkflowSnapshot, WorkflowState
+from personal_shopping_agent.intake import RequirementReviewer
 from personal_shopping_agent.presentation.ranking import CandidateScoringService
 from personal_shopping_agent.presentation.report_access import ShoppingReportReader
 from personal_shopping_agent.presentation.reporting import (
@@ -89,6 +90,8 @@ class ShoppingDecisionPipelineService:
         scoring_service: CandidateScoringService,
         report_service: ShoppingReportService,
         report_reader: ShoppingReportReader,
+        *,
+        requirement_reviewer: RequirementReviewer | None = None,
     ) -> None:
         self._workflow_service = workflow_service
         self._collection_service = collection_service
@@ -98,6 +101,7 @@ class ShoppingDecisionPipelineService:
         self._scoring_service = scoring_service
         self._report_service = report_service
         self._report_reader = report_reader
+        self._requirement_reviewer = requirement_reviewer or RequirementReviewer()
 
     async def run(
         self,
@@ -117,6 +121,7 @@ class ShoppingDecisionPipelineService:
         executed: list[WorkflowState] = []
         rendered: RenderedShoppingReport | None = None
         if snapshot.workflow.state is WorkflowState.REQUEST_VALIDATED:
+            self._requirement_reviewer.require_ready(snapshot.request)
             collected = await self._collection_service.collect(
                 workflow_id,
                 maximum_candidates=options.maximum_candidates,

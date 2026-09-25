@@ -33,6 +33,11 @@ from personal_shopping_agent.infrastructure.storage import (
 from personal_shopping_agent.infrastructure.storage.workflow_repository import (
     SQLiteWorkflowRepository,
 )
+from personal_shopping_agent.intake import (
+    SHOPPING_REQUEST_GUIDE,
+    RequirementReview,
+    RequirementReviewer,
+)
 from personal_shopping_agent.interfaces.composition import (
     NoOfficialEvidenceProvider,
     create_jd_pipeline_service,
@@ -94,16 +99,6 @@ PIPELINE_WRITE = ToolAnnotations(
     open_world_hint=True,
 )
 
-SHOPPING_REQUEST_GUIDE = """Prepare one shopping request from the user's own words.
-
-First call shopping_agent_status and do not assume unavailable capabilities exist. Identify the
-product category, normal budget, optional stretch budget, currency, region, and explicit criteria.
-Ask a concise follow-up when a required value is missing or when a hard requirement lacks a unit or
-direction. Preserve uncertainty instead of inventing specifications or prices. After confirmation,
-call start_shopping_workflow with only the user's stated constraints. Never claim that collection,
-ranking, purchase, or payment occurred unless the corresponding registered tool actually succeeds.
-"""
-
 
 class ManagedStatusPageCollector(StatusPageCollector, Protocol):
     """Status-aware collector with a server-owned asynchronous lifecycle."""
@@ -123,9 +118,12 @@ def create_mcp_server(
     *,
     explanation_provider: ExplanationProviderKind = ExplanationProviderKind.DISABLED,
     pipeline_service: ShoppingDecisionPipelineService | None = None,
+    requirement_reviewer: RequirementReviewer | None = None,
     lifespan: ServerLifespan | None = None,
 ) -> MCPServer[None]:
     """Register a deterministic, dependency-injected MCP server."""
+
+    reviewer = requirement_reviewer or RequirementReviewer()
 
     server = MCPServer(
         name="personal-shopping-agent",
@@ -133,7 +131,9 @@ def create_mcp_server(
         version=__version__,
         description="Evidence-driven personal shopping workflow service.",
         instructions=(
-            "Create and inspect local shopping workflows. Deterministic reports can be rendered "
+            "Review a structured shopping request, then create and inspect local shopping "
+            "workflows. Requests with blocking issues are rejected. Deterministic reports can be "
+            "rendered "
             "only after scoring has completed. Reading a report never calls an LLM; use the "
             "separate explanation tool to explicitly request an optional model-generated overlay. "
             "An end-to-end JD pipeline tool is present only in an explicitly configured server. "
@@ -162,7 +162,8 @@ def create_mcp_server(
         """Return an honest summary of implemented and unavailable capabilities."""
 
         return AgentCapabilities(
-            milestone="M7",
+            milestone="M8",
+            requirement_review=True,
             local_workflows=True,
             local_storage=True,
             end_to_end_pipeline=pipeline_service is not None,
@@ -175,12 +176,23 @@ def create_mcp_server(
             llm_explanation_provider=explanation_provider.value,
             automatic_purchase=False,
             message=(
-                "M7 live-JD entry is explicitly configured and resumable; real page "
+                "M8 live-JD entry is explicitly configured and resumable; real page "
                 "compatibility still requires manual acceptance."
                 if pipeline_service is not None
-                else "M7 local MCP is ready; live platform collection is not configured."
+                else "M8 local MCP is ready; live platform collection is not configured."
             ),
         )
+
+    @server.tool(
+        name="review_shopping_request",
+        title="Review a structured shopping request before starting",
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def _review_shopping_request(request: StartShoppingWorkflowInput) -> RequirementReview:
+        """List blocking gaps and warnings without storing, guessing, or accessing the network."""
+
+        return reviewer.review(request.to_domain())
 
     @server.tool(
         name="start_shopping_workflow",
@@ -191,7 +203,9 @@ def create_mcp_server(
     def _start_shopping_workflow(request: StartShoppingWorkflowInput) -> WorkflowSnapshot:
         """Validate a structured shopping need and create its local auditable workflow."""
 
-        return workflow_service.start(request.to_domain())
+        shopping_request = request.to_domain()
+        reviewer.require_ready(shopping_request)
+        return workflow_service.start(shopping_request)
 
     @server.tool(
         name="get_shopping_workflow",
@@ -272,6 +286,7 @@ def create_mcp_server(
     _ = (
         _prepare_shopping_request,
         _shopping_agent_status,
+        _review_shopping_request,
         _start_shopping_workflow,
         _get_shopping_workflow,
         _render_shopping_report,

@@ -90,6 +90,7 @@ class AgentCapabilities(MCPModel):
     """Honest feature status so the host cannot assume unfinished abilities exist."""
 
     milestone: str
+    requirement_review: bool
     local_workflows: bool
     local_storage: bool
     end_to_end_pipeline: bool
