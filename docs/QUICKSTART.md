@@ -6,7 +6,7 @@
 
 默认服务适合：
 
-- 让支持本地 stdio MCP 的 AI 宿主理解自然语言并创建结构化购物任务；
+- 让支持本地 stdio MCP 的 AI 宿主理解自然语言，先用 `review_shopping_request` 审查需求并追问缺口，再创建结构化购物任务；
 - 查询本地工作流状态；
 - 读取已经生成的确定性 Markdown / HTML 报告；
 - 在明确配置 OpenAI 或 DeepSeek 后请求可选解释。
@@ -104,7 +104,11 @@ stdio MCP 会等待宿主通信，因此终端没有普通交互提示是正常�
 
 Windows 可以使用正斜杠路径，例如 `C:/Users/name/personal-shopping-agent`。必须改成实际绝对路径。浏览器型 AI 宿主如果不能启动本地进程，则需要额外的受控远程 MCP 网关；本仓库目前不提供该网关。
 
-连接后先让 AI 调用 `shopping_agent_status`。默认结果应明确显示：本地工作流和报告可用，而 `platform_collection` 与 `end_to_end_pipeline` 为 `false`。
+连接后先让 AI 调用 `shopping_agent_status`。默认结果应明确显示：需求审查、本地工作流和报告可用，而 `platform_collection` 与 `end_to_end_pipeline` 为 `false`。
+
+创建任务前，AI 应调用 `review_shopping_request`。它不存储、不联网，只按评分规则指出问题：例如条件缺少
+最小/最大值方向、使用了评分无法识别的键（如“内存”应写作 `memory_capacity`）或单位与规范单位不一致。
+存在阻断问题时 `start_shopping_workflow` 会直接拒绝，避免在真实采集后才发现需求无法评分。
 
 ### 显式京东模式
 
@@ -153,9 +157,14 @@ uv run personal-shopping-agent doctor
 uv run personal-shopping-agent migrate
 uv run personal-shopping-agent data export <WORKFLOW_UUID> --output workflow-export.json
 uv run personal-shopping-agent data delete <WORKFLOW_UUID>
+uv run personal-shopping-agent improvement-case <WORKFLOW_UUID> --error-code <stable_error_code>
 ```
 
 删除命令第一次只生成预览和确认 token，不会立即删除。完整隐私与权限规则见 [`SECURITY.md`](../SECURITY.md)。
+
+`improvement-case` 只在终端打印一份脱敏改进案例预览：软件版本、停在哪个阶段、稳定错误码和需求结构
+摘要（条件数量、受支持的规范键等），不包含查询文字、品类、地区、金额、商品、卖家或链接，也不写文件、
+不上传。是否把它粘贴到私有 Issue 交给维护者或维护型 AI，由你决定。
 
 ## 8. 故障排查
 
@@ -165,6 +174,7 @@ uv run personal-shopping-agent data delete <WORKFLOW_UUID>
 | `doctor` 返回数据库未就绪 | 运行 `uv run personal-shopping-agent migrate` |
 | MCP 启动后没有普通文字界面 | 正常；它在等待 MCP 宿主通过 stdio 通信 |
 | AI 看不到 `run_shopping_pipeline` | 默认组合故意未开启真实平台采集 |
+| `start_shopping_workflow` 提示需要澄清 | 先调用 `review_shopping_request`，按每条建议向用户确认后重新提交 |
 | 京东模式启动即退出 | 确认显式开关、数据库迁移和 Playwright Chromium 已完成 |
 | 京东返回验证码、403 或 429 | 停止自动访问并由用户处理；不要增加绕过逻辑 |
 | 模型解释回退到原报告 | 检查提供方、模型名、API 密钥和网络；排名不受影响 |

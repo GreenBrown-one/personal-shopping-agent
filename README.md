@@ -4,11 +4,12 @@
 
 ## 当前结论
 
-M0–M7 的首轮架构、本地可用性与发布基线已经完成，核心代码可安装、可测试，也适合继续由人类或 AI 维护。默认服务保持离线；另有必须显式开启的京东 MCP 入口，但真实页面兼容性仍需在用户电脑上人工验收。
+M0–M7 的首轮架构、本地可用性与发布基线已经完成；M8 把代码按“明确需求 → 查找商品 → 呈现待购 → 自动化 → 自动进化”五层重组，核心代码可安装、可测试，也适合继续由人类或 AI 维护。默认服务保持离线；另有必须显式开启的京东 MCP 入口，但真实页面兼容性仍需在用户电脑上人工验收。
 
 | 能力 | 当前状态 |
 |---|---|
 | AI 宿主把自然语言整理成结构化购物需求 | 已支持，由 MCP 宿主完成 |
+| 开始前确定性审查需求并给出追问建议 | 已支持（`review_shopping_request`） |
 | 本地工作流、SQLite、确定性评分和可审计报告 | 已支持 |
 | OpenAI / DeepSeek 报告解释 | 可选，默认关闭 |
 | 京东搜索与详情解析、可恢复端到端管线 | 已提供显式安全入口；默认关闭，真实环境待验收 |
@@ -17,6 +18,7 @@ M0–M7 的首轮架构、本地可用性与发布基线已经完成，核心代
 | 默认 MCP 直接访问真实京东 | 尚未启用 |
 | 显式京东 MCP 入口 | 已实现；默认关闭，真实环境待验收 |
 | 淘宝、天猫、拼多多比较 | 尚未实现 |
+| 本地生成脱敏改进案例预览 | 已支持（`improvement-case` CLI，不上传） |
 | AI 自动修改并发布自身代码 | 不允许；改进必须走分支、测试、PR 和人工确认 |
 | 自动下单或支付 | 明确不提供 |
 
@@ -50,19 +52,24 @@ uv run --locked personal-shopping-agent-mcp
 
 ## 项目结构
 
-| 路径 | 职责 |
-|---|---|
-| `src/personal_shopping_agent/domain/` | 商品、报价、预算、证据等核心不变量 |
-| `src/personal_shopping_agent/application/` | 确定性用例、状态机、评分、报告与管线 |
-| `src/personal_shopping_agent/platforms/` | 可替换的平台解析适配器，目前为京东 |
-| `src/personal_shopping_agent/browser/` | 受控 Playwright 生命周期、导航和限频 |
-| `src/personal_shopping_agent/storage/` | SQLite、工作单元、仓储与数据生命周期 |
-| `src/personal_shopping_agent/mcp/` | AI 宿主使用的类型化工具边界 |
-| `src/personal_shopping_agent/llm/` | OpenAI / DeepSeek 可选解释适配器 |
-| `src/personal_shopping_agent/rendering/` | 确定性 Markdown 与安全 HTML 呈现 |
-| `migrations/` | 唯一数据库迁移历史 |
-| `tests/` | 离线单元、集成和端到端回归测试 |
-| `scripts/` | 初始化与隔离 wheel 验收脚本 |
+代码按购物决策的五个能力层组织，每层一个包；技术适配器放在它服务的层内部。
+
+| 路径 | 模块 | 职责 |
+|---|---|---|
+| `src/personal_shopping_agent/intake/` | ① 明确用户需求 | 用与评分相同的规则审查结构化需求，列出阻断问题、警告和追问建议 |
+| `src/personal_shopping_agent/sourcing/` | ② 自动查找对应商品 | 搜索、受限详情采集、Offer 转换、官方核验、规格规范化；`browser/` 受控 Playwright，`platforms/` 京东解析器 |
+| `src/personal_shopping_agent/presentation/` | ③ 呈现待购商品 | 条件效用、证据置信度、排名、确定性报告；`rendering/` 安全 HTML，`llm/` 可选解释 |
+| `src/personal_shopping_agent/automation/` | ④ 自动化 | 工作流生命周期、可恢复端到端管线、单工作流导出/删除 |
+| `src/personal_shopping_agent/evolution/` | ⑤ 自动进化 | 本地生成只含代码与结构信息的脱敏改进案例，交给维护型 AI 流程 |
+| `src/personal_shopping_agent/domain/` | 共享内核 | 商品、报价、证据、状态机、规格计量目录与条件规则 |
+| `src/personal_shopping_agent/infrastructure/` | 共享设施 | SQLite 存储与迁移、私有文件边界、进程设置 |
+| `src/personal_shopping_agent/interfaces/` | 外层接口 | MCP 服务器、CLI、健康检查、宿主配置与组合根 |
+| `migrations/` | — | 唯一数据库迁移历史 |
+| `tests/` | — | `unit/` 按层分目录；`integration/` 覆盖跨层与端到端；`unit/test_architecture.py` 强制层间依赖方向 |
+| `scripts/` | — | 初始化与隔离 wheel 验收脚本 |
+
+依赖只能由外向内：需求层与进化层只依赖共享内核，呈现层可读取查找层产出的事实契约，自动化层编排前三层，
+只有 `interfaces/` 可以同时装配存储、浏览器和模型。详细规则见 [DESIGN.md 第 3 节](DESIGN.md#3-模块划分与分层)。
 
 规范性设计以 [DESIGN.md](DESIGN.md) 为准；安全与发布边界见 [SECURITY.md](SECURITY.md)；AI 或人类贡献者须遵守 [AGENTS.md](AGENTS.md)。可迁移到其他 Agent 项目的工程经验总结在 [ENGINEERING_LESSONS.md](docs/ENGINEERING_LESSONS.md)。
 
