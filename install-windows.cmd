@@ -18,7 +18,9 @@ if errorlevel 1 (
 )
 
 echo.
-choice /C YN /M "Enable live JD shopping (you will sign in to JD yourself)"
+echo By default you browse JD yourself and save pages into data\inbox; the assistant does the rest.
+echo Automated browser collection is EXPERIMENTAL and JD currently blocks it. Answer N unless testing it.
+choice /C YN /M "Enable experimental automated browser collection"
 if errorlevel 2 (set "LIVE=") else (set "LIVE=--live-jd")
 
 uv run --locked python scripts\bootstrap.py --claude-desktop %LIVE%
@@ -42,6 +44,7 @@ if errorlevel 1 echo Chip ranking refresh failed. Shopping still works without c
 :done
 echo.
 echo Setup finished. Fully quit Claude Desktop (tray icon, Quit) and open it again.
+echo To shop: tell Claude your need; it will list the JD pages to open and save into data\inbox.
 pause
 exit /b 0
 

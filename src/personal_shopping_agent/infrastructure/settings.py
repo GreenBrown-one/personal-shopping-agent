@@ -9,6 +9,8 @@ DATABASE_URL_ENV = "PERSONAL_SHOPPING_DATABASE_URL"
 LIVE_JD_ACCESS_ENV = "PERSONAL_SHOPPING_ENABLE_LIVE_JD"
 LIVE_JD_HEADLESS_ENV = "PERSONAL_SHOPPING_JD_HEADLESS"
 BENCHMARK_FILE_ENV = "PERSONAL_SHOPPING_BENCHMARK_FILE"
+INBOX_DIR_ENV = "PERSONAL_SHOPPING_INBOX_DIR"
+DEFAULT_INBOX_DIR = "data/inbox"
 DEFAULT_BENCHMARK_FILE = "data/benchmarks/socpk-allperf.json"
 
 
@@ -40,6 +42,13 @@ def benchmark_file_from_environment(environment: Mapping[str, str] | None = None
 
     values = os.environ if environment is None else environment
     return values.get(BENCHMARK_FILE_ENV, DEFAULT_BENCHMARK_FILE)
+
+
+def inbox_directory_from_environment(environment: Mapping[str, str] | None = None) -> str:
+    """Read the private directory the user saves browser pages into."""
+
+    values = os.environ if environment is None else environment
+    return values.get(INBOX_DIR_ENV, DEFAULT_INBOX_DIR)
 
 
 def load_live_jd_settings(environment: Mapping[str, str] | None = None) -> LiveJDSettings:

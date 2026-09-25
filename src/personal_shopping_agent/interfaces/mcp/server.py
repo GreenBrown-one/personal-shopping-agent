@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator, Callable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID
@@ -26,6 +27,7 @@ from personal_shopping_agent.infrastructure.settings import (
     LiveJDConfigurationError,
     benchmark_file_from_environment,
     database_url_from_environment,
+    inbox_directory_from_environment,
     load_live_jd_settings,
 )
 from personal_shopping_agent.infrastructure.storage import (
@@ -73,13 +75,18 @@ from personal_shopping_agent.sourcing import (
     IndependentEvidenceProvider,
     OfficialEvidenceProvider,
     PageCollector,
+    SavedPagePlan,
+    SavedPagePlanner,
 )
 from personal_shopping_agent.sourcing.browser import (
     BrowserManager,
     BrowserManagerSettings,
     ControlledPageCollector,
+    SavedPageCollector,
     StatusPageCollector,
 )
+from personal_shopping_agent.sourcing.platforms import JDSearchAdapter
+from personal_shopping_agent.sourcing.platforms.jd import jd_page_key
 
 READ_ONLY = ToolAnnotations(
     read_only_hint=True,
@@ -107,6 +114,28 @@ PIPELINE_WRITE = ToolAnnotations(
 )
 
 
+class CollectionMode(StrEnum):
+    """Where platform pages come from; reported honestly in shopping_agent_status."""
+
+    NONE = "none"
+    ASSISTED = "assisted"
+    BROWSER = "browser"
+
+
+_STATUS_MESSAGES = {
+    CollectionMode.NONE: "Local workflows and reports are ready; no platform collection is set up.",
+    CollectionMode.ASSISTED: (
+        "Assisted collection: the user saves JD pages from their own browser into data/inbox. "
+        "Call list_pages_to_save, ask the user to save any unsaved URL, then "
+        "run_shopping_pipeline. No network access."
+    ),
+    CollectionMode.BROWSER: (
+        "Experimental automated browser collection is configured; JD may block it and real page "
+        "compatibility still requires manual acceptance."
+    ),
+}
+
+
 class ManagedStatusPageCollector(StatusPageCollector, Protocol):
     """Status-aware collector with a server-owned asynchronous lifecycle."""
 
@@ -127,6 +156,8 @@ def create_mcp_server(
     pipeline_service: ShoppingDecisionPipelineService | None = None,
     requirement_reviewer: RequirementReviewer | None = None,
     chip_benchmark: bool = False,
+    collection_mode: CollectionMode = CollectionMode.NONE,
+    page_planner: SavedPagePlanner | None = None,
     lifespan: ServerLifespan | None = None,
 ) -> MCPServer[None]:
     """Register a deterministic, dependency-injected MCP server."""
@@ -171,7 +202,7 @@ def create_mcp_server(
         """Return an honest summary of implemented and unavailable capabilities."""
 
         return AgentCapabilities(
-            milestone="M8",
+            milestone="M9",
             requirement_review=True,
             local_workflows=True,
             local_storage=True,
@@ -180,17 +211,13 @@ def create_mcp_server(
             cross_platform_comparison=False,
             ranking=pipeline_service is not None,
             chip_benchmark=chip_benchmark,
+            collection_mode=collection_mode.value,
             deterministic_reports=True,
             html_reports=True,
             llm_explanations=explanation_provider is not ExplanationProviderKind.DISABLED,
             llm_explanation_provider=explanation_provider.value,
             automatic_purchase=False,
-            message=(
-                "M8 live-JD entry is explicitly configured and resumable; real page "
-                "compatibility still requires manual acceptance."
-                if pipeline_service is not None
-                else "M8 local MCP is ready; live platform collection is not configured."
-            ),
+            message=_STATUS_MESSAGES[collection_mode],
         )
 
     @server.tool(
@@ -282,7 +309,9 @@ def create_mcp_server(
         @server.tool(
             name="run_shopping_pipeline",
             title="Run or resume the configured shopping decision pipeline",
-            annotations=PIPELINE_WRITE,
+            annotations=(
+                PIPELINE_WRITE if collection_mode is CollectionMode.BROWSER else LOCAL_WRITE
+            ),
             structured_output=True,
         )
         async def _run_shopping_pipeline(
@@ -297,6 +326,27 @@ def create_mcp_server(
             return PipelineRunView.from_result(result)
 
         _ = _run_shopping_pipeline
+
+    if page_planner is not None:
+        planner = page_planner
+
+        @server.tool(
+            name="list_pages_to_save",
+            title="List the JD pages the user should save for the assisted pipeline",
+            annotations=READ_ONLY,
+            structured_output=True,
+        )
+        async def _list_pages_to_save(request: RunShoppingPipelineInput) -> SavedPagePlan:
+            """Show the search and product pages the pipeline will read and which are saved."""
+
+            snapshot = workflow_service.get(request.workflow_id)
+            return await planner.plan(
+                snapshot.request.query,
+                maximum_candidates=request.maximum_candidates,
+                maximum_details=request.maximum_details,
+            )
+
+        _ = _list_pages_to_save
 
     _ = (
         _prepare_shopping_request,
@@ -318,6 +368,8 @@ def _create_server_for_session_factory(
     *,
     pipeline_service: ShoppingDecisionPipelineService | None = None,
     chip_benchmark: bool = False,
+    collection_mode: CollectionMode = CollectionMode.NONE,
+    page_planner: SavedPagePlanner | None = None,
     lifespan: ServerLifespan | None = None,
 ) -> MCPServer[None]:
     return create_mcp_server(
@@ -331,6 +383,8 @@ def _create_server_for_session_factory(
         explanation_provider=settings.provider,
         pipeline_service=pipeline_service,
         chip_benchmark=chip_benchmark,
+        collection_mode=collection_mode,
+        page_planner=page_planner,
         lifespan=lifespan,
     )
 
@@ -340,12 +394,27 @@ def create_server_for_database(
     *,
     environment: Mapping[str, str] | None = None,
 ) -> MCPServer[None]:
-    """Construct the production adapter graph for an already migrated SQLite database."""
+    """Construct the default graph: local workflows plus assisted collection from saved pages."""
 
     engine = create_sqlite_engine(database_url)
     session_factory = create_session_factory(engine)
     settings = load_llm_explanation_settings(environment)
-    return _create_server_for_session_factory(session_factory, settings)
+    inbox = Path(inbox_directory_from_environment(environment))
+    collector = SavedPageCollector(inbox, jd_page_key)
+    independent_providers = load_chip_benchmark_providers(environment)
+    return _create_server_for_session_factory(
+        session_factory,
+        settings,
+        pipeline_service=create_jd_pipeline_service(
+            session_factory,
+            collector,
+            NoOfficialEvidenceProvider(),
+            independent_providers=independent_providers,
+        ),
+        chip_benchmark=bool(independent_providers),
+        collection_mode=CollectionMode.ASSISTED,
+        page_planner=SavedPagePlanner(collector, JDSearchAdapter()),
+    )
 
 
 def create_jd_pipeline_server_for_database(
@@ -373,6 +442,7 @@ def create_jd_pipeline_server_for_database(
         settings,
         pipeline_service=pipeline_service,
         chip_benchmark=bool(independent_providers),
+        collection_mode=CollectionMode.BROWSER,
         lifespan=lifespan,
     )
 

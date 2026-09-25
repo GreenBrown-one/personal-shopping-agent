@@ -29,3 +29,4 @@ artifacts/
 reports/
 screenshots/
 playwright/.auth/
+data/inbox/

@@ -58,7 +58,7 @@ def test_live_jd_server_manages_the_collector_and_reports_honest_capabilities() 
             assert collector.started == 1
             result = await client.call_tool("shopping_agent_status", {})
             assert result.structured_content is not None
-            assert result.structured_content["milestone"] == "M8"
+            assert result.structured_content["milestone"] == "M9"
             assert result.structured_content["end_to_end_pipeline"] is True
             assert result.structured_content["platform_collection"] is True
             assert result.structured_content["automatic_purchase"] is False

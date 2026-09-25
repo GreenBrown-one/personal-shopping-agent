@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from html.parser import HTMLParser
 from typing import ClassVar
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from personal_shopping_agent.sourcing.discovery import (
     CollectedPage,
@@ -168,6 +168,26 @@ def normalize_jd_item_url(link: str | None, sku: str) -> str | None:
     ):
         return None
     return f"https://{JD_ITEM_HOST}/{sku}.html"
+
+
+_ITEM_PATH = re.compile(r"/(?P<sku>\d{1,32})\.html")
+
+
+def jd_page_key(url: str) -> str | None:
+    """Identify a JD search page by keyword, or an item page by SKU; anything else is None."""
+
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    hostname = (parts.hostname or "").lower()
+    if hostname == JD_ITEM_HOST:
+        item = _ITEM_PATH.fullmatch(parts.path)
+        return f"item:{item.group('sku')}" if item else None
+    if hostname == JD_SEARCH_HOST:
+        keyword = " ".join(parse_qs(parts.query).get("keyword", [""])[0].split())
+        return f"search:{keyword}" if keyword else None
+    return None
 
 
 class JDSearchAdapter:
