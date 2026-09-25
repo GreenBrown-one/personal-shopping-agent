@@ -8,12 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from personal_shopping_agent.application.conversion import (
-    ConvertedDetailBatch,
-    DetailObservationConverter,
-)
-from personal_shopping_agent.application.observations import DetailObservation
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import Evidence, Offer, Product
+from personal_shopping_agent.domain.workflow import (
     InvalidWorkflowTransitionError,
     ShoppingWorkflow,
     WorkflowEvent,
@@ -22,7 +18,11 @@ from personal_shopping_agent.application.workflow import (
     WorkflowStateMachine,
     workflow_now,
 )
-from personal_shopping_agent.domain import Evidence, Offer, Product
+from personal_shopping_agent.sourcing.conversion import (
+    ConvertedDetailBatch,
+    DetailObservationConverter,
+)
+from personal_shopping_agent.sourcing.observations import DetailObservation
 
 
 class OfferIngestionResult(BaseModel):

@@ -7,14 +7,18 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import delete, text
 
-from personal_shopping_agent.application import (
-    ShoppingWorkflow,
+from personal_shopping_agent.automation import (
     ShoppingWorkflowService,
+)
+from personal_shopping_agent.domain import (
+    Budget,
+    Money,
+    ShoppingRequest,
+    ShoppingWorkflow,
     WorkflowState,
     WorkflowStateMachine,
 )
-from personal_shopping_agent.domain import Budget, Money, ShoppingRequest
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     ConcurrentWorkflowUpdateError,
     DuplicateEntityError,
     EntityNotFoundError,
@@ -24,7 +28,7 @@ from personal_shopping_agent.storage import (
     create_session_factory,
     create_sqlite_engine,
 )
-from personal_shopping_agent.storage.tables import ShoppingRequestRecord
+from personal_shopping_agent.infrastructure.storage.tables import ShoppingRequestRecord
 
 NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 

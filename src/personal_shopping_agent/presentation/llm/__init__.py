@@ -1,6 +1,6 @@
 """Replaceable LLM adapters for optional report explanations."""
 
-from personal_shopping_agent.llm.config import (
+from personal_shopping_agent.presentation.llm.config import (
     ExplanationProviderKind,
     LLMConfigurationError,
     LLMConfigurationErrorCode,
@@ -10,8 +10,10 @@ from personal_shopping_agent.llm.config import (
     create_report_presentation_service_from_environment,
     load_llm_explanation_settings,
 )
-from personal_shopping_agent.llm.deepseek_adapter import DeepSeekReportExplanationAdapter
-from personal_shopping_agent.llm.openai_adapter import OpenAIReportExplanationAdapter
+from personal_shopping_agent.presentation.llm.deepseek_adapter import (
+    DeepSeekReportExplanationAdapter,
+)
+from personal_shopping_agent.presentation.llm.openai_adapter import OpenAIReportExplanationAdapter
 
 __all__ = [
     "DeepSeekReportExplanationAdapter",

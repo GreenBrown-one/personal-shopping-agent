@@ -1,12 +1,12 @@
 """MCP interface package."""
 
-from personal_shopping_agent.mcp.schemas import (
+from personal_shopping_agent.interfaces.mcp.schemas import (
     AgentCapabilities,
     CriterionInput,
     RunShoppingPipelineInput,
     StartShoppingWorkflowInput,
 )
-from personal_shopping_agent.mcp.server import (
+from personal_shopping_agent.interfaces.mcp.server import (
     create_default_server,
     create_jd_pipeline_server_for_database,
     create_live_jd_server,

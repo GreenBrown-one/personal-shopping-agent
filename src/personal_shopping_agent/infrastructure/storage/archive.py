@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-from personal_shopping_agent.application.data_lifecycle import (
+from personal_shopping_agent.automation.data_lifecycle import (
     ArchiveTargetExistsError,
     ArchiveWriteError,
     ArchiveWriteReceipt,

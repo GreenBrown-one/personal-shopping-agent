@@ -10,16 +10,16 @@ import pytest
 from pydantic import HttpUrl
 from sqlalchemy import Engine, event, func, select
 
-from personal_shopping_agent.application import (
-    CandidateDiscoveryService,
-    ProductDetailService,
-    SearchDetailCollectionService,
+from personal_shopping_agent.automation import (
     ShoppingWorkflowService,
+)
+from personal_shopping_agent.domain import (
+    Budget,
+    Money,
+    ShoppingRequest,
     WorkflowState,
 )
-from personal_shopping_agent.domain import Budget, Money, ShoppingRequest
-from personal_shopping_agent.platforms import JDDetailAdapter, JDSearchAdapter
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     SQLitePlatformObservationRepository,
     SQLiteSearchDetailUnitOfWork,
     SQLiteWorkflowRepository,
@@ -27,10 +27,16 @@ from personal_shopping_agent.storage import (
     create_session_factory,
     create_sqlite_engine,
 )
-from personal_shopping_agent.storage.tables import (
+from personal_shopping_agent.infrastructure.storage.tables import (
     PlatformObservationRecord,
     ShoppingRequestRecord,
 )
+from personal_shopping_agent.sourcing import (
+    CandidateDiscoveryService,
+    ProductDetailService,
+    SearchDetailCollectionService,
+)
+from personal_shopping_agent.sourcing.platforms import JDDetailAdapter, JDSearchAdapter
 
 NOW = datetime(2026, 8, 9, 16, 0, tzinfo=UTC)
 FIXTURE_ROOT = Path(__file__).parents[1] / "fixtures" / "jd"

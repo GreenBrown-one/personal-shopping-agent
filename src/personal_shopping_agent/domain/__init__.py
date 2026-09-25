@@ -1,4 +1,7 @@
-"""Public domain contracts."""
+"""Shared kernel: domain contracts, invariants, and the deterministic workflow state machine.
+
+Every capability layer depends on this package; it depends on none of them.
+"""
 
 from personal_shopping_agent.domain.enums import (
     EvidenceSourceType,
@@ -17,12 +20,23 @@ from personal_shopping_agent.domain.models import (
     ShoppingRequest,
     Specification,
 )
+from personal_shopping_agent.domain.serialization import JsonContractModel
+from personal_shopping_agent.domain.workflow import (
+    InvalidWorkflowTransitionError,
+    ShoppingWorkflow,
+    WorkflowEvent,
+    WorkflowSnapshot,
+    WorkflowState,
+    WorkflowStateMachine,
+)
 
 __all__ = [
     "Budget",
     "Evidence",
     "EvidenceSourceType",
     "EvidenceSubjectType",
+    "InvalidWorkflowTransitionError",
+    "JsonContractModel",
     "Money",
     "Offer",
     "PriceBreakdown",
@@ -30,6 +44,11 @@ __all__ = [
     "Product",
     "ShoppingCriterion",
     "ShoppingRequest",
+    "ShoppingWorkflow",
     "Specification",
     "StoreType",
+    "WorkflowEvent",
+    "WorkflowSnapshot",
+    "WorkflowState",
+    "WorkflowStateMachine",
 ]

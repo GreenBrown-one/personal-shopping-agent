@@ -6,23 +6,23 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application.normalization import NormalizedSpecification
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import Evidence, EvidenceSubjectType, Product
+from personal_shopping_agent.domain.workflow import (
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
 )
-from personal_shopping_agent.domain import Evidence, EvidenceSubjectType, Product
-from personal_shopping_agent.storage.repository import domain_payload
-from personal_shopping_agent.storage.tables import (
+from personal_shopping_agent.infrastructure.storage.repository import domain_payload
+from personal_shopping_agent.infrastructure.storage.tables import (
     EvidenceRecord,
     NormalizedSpecificationRecord,
     ProductRecord,
 )
-from personal_shopping_agent.storage.workflow_repository import (
+from personal_shopping_agent.infrastructure.storage.workflow_repository import (
     apply_workflow_transition,
     load_workflow_snapshot,
 )
+from personal_shopping_agent.sourcing.normalization import NormalizedSpecification
 
 
 def normalized_specification_record(

@@ -18,9 +18,9 @@ from personal_shopping_agent.__about__ import __version__
 
 _PROJECT_NAME = "personal-shopping-agent"
 _EXPECTED_CONSOLE_SCRIPTS = {
-    "personal-shopping-agent": "personal_shopping_agent.cli:main",
-    "personal-shopping-agent-mcp": "personal_shopping_agent.mcp.server:main",
-    "personal-shopping-agent-mcp-jd": "personal_shopping_agent.mcp.server:main_jd",
+    "personal-shopping-agent": "personal_shopping_agent.interfaces.cli:main",
+    "personal-shopping-agent-mcp": "personal_shopping_agent.interfaces.mcp.server:main",
+    "personal-shopping-agent-mcp-jd": "personal_shopping_agent.interfaces.mcp.server:main_jd",
 }
 _REQUIRED_MEMBERS = {
     "personal_shopping_agent/__about__.py",
@@ -33,7 +33,7 @@ _REQUIRED_MEMBERS = {
     "personal_shopping_agent/migrations/versions/20260809_0005_normalized_specifications.py",
     "personal_shopping_agent/migrations/versions/20260809_0006_candidate_scores.py",
     "personal_shopping_agent/migrations/versions/20260809_0007_shopping_reports.py",
-    "personal_shopping_agent/templates/shopping_report.html.j2",
+    "personal_shopping_agent/presentation/rendering/templates/shopping_report.html.j2",
 }
 
 
@@ -288,7 +288,7 @@ def _verify_clean_install(wheel: Path, wheel_version: str) -> None:
                 "import sys",
                 "from pathlib import Path",
                 "import personal_shopping_agent as package",
-                "from personal_shopping_agent.mcp.server import create_default_server",
+                "from personal_shopping_agent.interfaces.mcp.server import create_default_server",
                 "server = create_default_server()",
                 "package_path = Path(package.__file__).resolve()",
                 "assert package_path.is_relative_to(Path(sys.prefix).resolve())",

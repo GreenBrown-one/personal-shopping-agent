@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from personal_shopping_agent.browser import NavigationPolicy, NavigationPolicyError
-from personal_shopping_agent.browser.policy import resolve_addresses
+from personal_shopping_agent.sourcing.browser import NavigationPolicy, NavigationPolicyError
+from personal_shopping_agent.sourcing.browser.policy import resolve_addresses
 
 PUBLIC_ADDRESSES = ("8.8.8.8", "2001:4860:4860::8888")
 

@@ -3,11 +3,11 @@
 from typing import Protocol
 from uuid import UUID
 
-from personal_shopping_agent.application.explanation import (
+from personal_shopping_agent.presentation.explanation import (
     RenderedShoppingReportPresentation,
     ShoppingReportPresentationService,
 )
-from personal_shopping_agent.application.reporting import (
+from personal_shopping_agent.presentation.reporting import (
     RenderedShoppingReport,
     ShoppingReportRenderer,
 )

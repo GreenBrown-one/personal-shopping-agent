@@ -13,7 +13,43 @@ from pydantic import HttpUrl
 from sqlalchemy import Engine
 
 from personal_shopping_agent import __version__
-from personal_shopping_agent.application import (
+from personal_shopping_agent.automation import (
+    ShoppingWorkflowService,
+)
+from personal_shopping_agent.domain import (
+    Budget,
+    Evidence,
+    EvidenceSourceType,
+    EvidenceSubjectType,
+    Money,
+    Offer,
+    PriceBreakdown,
+    PriceKind,
+    Product,
+    ShoppingCriterion,
+    ShoppingRequest,
+    StoreType,
+    WorkflowSnapshot,
+    WorkflowState,
+)
+from personal_shopping_agent.infrastructure.storage import (
+    SQLiteShoppingReportRepository,
+    SQLiteShoppingReportUnitOfWork,
+    SQLiteShoppingRepository,
+    SQLiteWorkflowRepository,
+    create_schema,
+    create_session_factory,
+    create_sqlite_engine,
+    session_scope,
+)
+from personal_shopping_agent.infrastructure.storage.scoring_unit_of_work import (
+    candidate_score_record,
+)
+from personal_shopping_agent.interfaces.mcp.server import (
+    create_mcp_server,
+    create_server_for_database,
+)
+from personal_shopping_agent.presentation import (
     CandidateDecisionInput,
     CandidateEvidenceConfidence,
     CandidateRankingEngine,
@@ -29,42 +65,13 @@ from personal_shopping_agent.application import (
     ShoppingReportAccessService,
     ShoppingReportResult,
     ShoppingReportService,
-    ShoppingWorkflowService,
-    WorkflowSnapshot,
-    WorkflowState,
 )
-from personal_shopping_agent.domain import (
-    Budget,
-    Evidence,
-    EvidenceSourceType,
-    EvidenceSubjectType,
-    Money,
-    Offer,
-    PriceBreakdown,
-    PriceKind,
-    Product,
-    ShoppingCriterion,
-    ShoppingRequest,
-    StoreType,
-)
-from personal_shopping_agent.llm import (
+from personal_shopping_agent.presentation.llm import (
     ExplanationProviderKind,
     LLMExplanationSettings,
     create_report_presentation_service,
 )
-from personal_shopping_agent.mcp.server import create_mcp_server, create_server_for_database
-from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
-from personal_shopping_agent.storage import (
-    SQLiteShoppingReportRepository,
-    SQLiteShoppingReportUnitOfWork,
-    SQLiteShoppingRepository,
-    SQLiteWorkflowRepository,
-    create_schema,
-    create_session_factory,
-    create_sqlite_engine,
-    session_scope,
-)
-from personal_shopping_agent.storage.scoring_unit_of_work import candidate_score_record
+from personal_shopping_agent.presentation.rendering import HtmlShoppingReportRenderer
 
 NOW = datetime(2026, 8, 9, 20, 0, tzinfo=UTC)
 REPORT_AT = NOW + timedelta(seconds=1)

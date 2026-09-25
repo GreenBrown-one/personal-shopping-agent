@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import HttpUrl
 
-from personal_shopping_agent.browser import (
+from personal_shopping_agent.sourcing.browser import (
     BrowserManagerError,
     ControlledPageCollector,
     PageAccessRestrictedError,

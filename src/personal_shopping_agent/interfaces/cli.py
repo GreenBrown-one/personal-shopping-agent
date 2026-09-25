@@ -9,7 +9,7 @@ from uuid import UUID
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.automation import (
     ArchiveTargetExistsError,
     ArchiveWriteError,
     WorkflowDataIntegrityError,
@@ -18,13 +18,8 @@ from personal_shopping_agent.application import (
     WorkflowDeletionConfirmationError,
     WorkflowDeletionPlanStaleError,
 )
-from personal_shopping_agent.health import health_check
-from personal_shopping_agent.host_config import (
-    SourceCheckoutError,
-    build_source_mcp_configuration,
-)
-from personal_shopping_agent.runtime_settings import database_url_from_environment
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.settings import database_url_from_environment
+from personal_shopping_agent.infrastructure.storage import (
     DatabaseMigrationError,
     DatabaseMigrationStatus,
     DatabaseSchemaNotReadyError,
@@ -36,6 +31,11 @@ from personal_shopping_agent.storage import (
     inspect_database_migrations,
     require_current_database,
     upgrade_database,
+)
+from personal_shopping_agent.interfaces.health import health_check
+from personal_shopping_agent.interfaces.host_config import (
+    SourceCheckoutError,
+    build_source_mcp_configuration,
 )
 
 

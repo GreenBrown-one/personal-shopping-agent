@@ -2,24 +2,12 @@
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application import (
-    CandidateDiscoveryService,
-    CandidateScoringService,
-    EvidenceCrossCheckService,
-    OfferIngestionService,
-    OfficialEvidenceProvider,
-    OfficialProductObservation,
-    PageCollector,
-    ProductDetailService,
-    SearchDetailCollectionService,
+from personal_shopping_agent.automation import (
     ShoppingDecisionPipelineService,
-    ShoppingReportService,
     ShoppingWorkflowService,
-    SpecificationNormalizationService,
 )
 from personal_shopping_agent.domain import Product
-from personal_shopping_agent.platforms import JDDetailAdapter, JDSearchAdapter
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     SQLiteCandidateScoringUnitOfWork,
     SQLiteEvidenceCrossCheckUnitOfWork,
     SQLiteOfferIngestionUnitOfWork,
@@ -29,6 +17,22 @@ from personal_shopping_agent.storage import (
     SQLiteSpecificationNormalizationUnitOfWork,
     SQLiteWorkflowRepository,
 )
+from personal_shopping_agent.presentation import (
+    CandidateScoringService,
+    ShoppingReportService,
+)
+from personal_shopping_agent.sourcing import (
+    CandidateDiscoveryService,
+    EvidenceCrossCheckService,
+    OfferIngestionService,
+    OfficialEvidenceProvider,
+    OfficialProductObservation,
+    PageCollector,
+    ProductDetailService,
+    SearchDetailCollectionService,
+    SpecificationNormalizationService,
+)
+from personal_shopping_agent.sourcing.platforms import JDDetailAdapter, JDSearchAdapter
 
 
 class NoOfficialEvidenceProvider:

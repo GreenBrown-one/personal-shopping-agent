@@ -6,7 +6,8 @@ from decimal import Decimal
 from jinja2 import PackageLoader, StrictUndefined, select_autoescape
 from jinja2.sandbox import SandboxedEnvironment
 
-from personal_shopping_agent.application.reporting import (
+from personal_shopping_agent.domain import Money
+from personal_shopping_agent.presentation.reporting import (
     REPORT_BUDGET_LABELS,
     REPORT_EXCLUSION_LABELS,
     REPORT_STATUS_LABELS,
@@ -14,7 +15,6 @@ from personal_shopping_agent.application.reporting import (
     ReportFormat,
     ShoppingDecisionReport,
 )
-from personal_shopping_agent.domain import Money
 
 _TEMPLATE_NAME = "shopping_report.html.j2"
 
@@ -28,7 +28,7 @@ def _format_money(value: Money) -> str:
 
 
 _HTML_ENVIRONMENT = SandboxedEnvironment(
-    loader=PackageLoader("personal_shopping_agent", "templates"),
+    loader=PackageLoader("personal_shopping_agent.presentation.rendering", "templates"),
     autoescape=select_autoescape(
         enabled_extensions=("html", "htm", "xml", "j2"),
         default_for_string=True,

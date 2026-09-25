@@ -5,12 +5,12 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.infrastructure.storage.tables import ShoppingReportRecord
+from personal_shopping_agent.presentation import (
     RenderedShoppingReport,
     ShoppingReportNotFoundError,
     StoredShoppingReportIntegrityError,
 )
-from personal_shopping_agent.storage.tables import ShoppingReportRecord
 
 
 class SQLiteShoppingReportRepository:

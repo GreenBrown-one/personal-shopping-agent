@@ -15,8 +15,8 @@ from personal_shopping_agent.domain import (
     Product,
     ShoppingRequest,
 )
-from personal_shopping_agent.storage.database import session_scope
-from personal_shopping_agent.storage.tables import (
+from personal_shopping_agent.infrastructure.storage.database import session_scope
+from personal_shopping_agent.infrastructure.storage.tables import (
     Base,
     EvidenceRecord,
     OfferRecord,

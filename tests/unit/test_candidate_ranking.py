@@ -8,7 +8,27 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.domain import (
+    Budget,
+    Evidence,
+    EvidenceSourceType,
+    EvidenceSubjectType,
+    InvalidWorkflowTransitionError,
+    Money,
+    Offer,
+    PriceBreakdown,
+    PriceKind,
+    Product,
+    ShoppingCriterion,
+    ShoppingRequest,
+    ShoppingWorkflow,
+    StoreType,
+    WorkflowEvent,
+    WorkflowSnapshot,
+    WorkflowState,
+    WorkflowStateMachine,
+)
+from personal_shopping_agent.presentation import (
     BudgetStatus,
     CandidateDecisionInput,
     CandidateEvidenceConfidence,
@@ -21,32 +41,14 @@ from personal_shopping_agent.application import (
     CriterionEvaluationStatus,
     CriterionEvidenceAssessment,
     DuplicateCandidateError,
+    NoCandidatesForScoringError,
+    OfferCostAssessment,
+)
+from personal_shopping_agent.sourcing import (
     EvidenceCheck,
     EvidenceCheckStatus,
-    InvalidWorkflowTransitionError,
-    NoCandidatesForScoringError,
     NormalizedSpecification,
-    OfferCostAssessment,
-    ShoppingWorkflow,
     SpecificationNormalizationStatus,
-    WorkflowEvent,
-    WorkflowSnapshot,
-    WorkflowState,
-    WorkflowStateMachine,
-)
-from personal_shopping_agent.domain import (
-    Budget,
-    Evidence,
-    EvidenceSourceType,
-    EvidenceSubjectType,
-    Money,
-    Offer,
-    PriceBreakdown,
-    PriceKind,
-    Product,
-    ShoppingCriterion,
-    ShoppingRequest,
-    StoreType,
 )
 
 NOW = datetime(2026, 8, 10, 0, 0, tzinfo=UTC)

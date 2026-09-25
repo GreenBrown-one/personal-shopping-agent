@@ -2,7 +2,7 @@
 
 import pytest
 
-from personal_shopping_agent.runtime_settings import (
+from personal_shopping_agent.infrastructure.settings import (
     LIVE_JD_ACCESS_ENV,
     LIVE_JD_HEADLESS_ENV,
     LiveJDConfigurationError,

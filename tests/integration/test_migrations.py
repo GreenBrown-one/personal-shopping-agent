@@ -5,7 +5,7 @@ from pathlib import Path
 from alembic import command
 from sqlalchemy import create_engine, inspect, text
 
-from personal_shopping_agent.storage import create_migration_config
+from personal_shopping_agent.infrastructure.storage import create_migration_config
 
 
 def test_initial_migration_upgrades_and_downgrades(tmp_path: Path) -> None:

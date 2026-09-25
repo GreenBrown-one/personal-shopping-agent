@@ -8,20 +8,20 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import ShoppingRequest
+from personal_shopping_agent.domain.workflow import (
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
 )
-from personal_shopping_agent.domain import ShoppingRequest
-from personal_shopping_agent.storage.database import session_scope
-from personal_shopping_agent.storage.repository import (
+from personal_shopping_agent.infrastructure.storage.database import session_scope
+from personal_shopping_agent.infrastructure.storage.repository import (
     DuplicateEntityError,
     EntityNotFoundError,
     InvalidReferenceError,
     domain_payload,
 )
-from personal_shopping_agent.storage.tables import (
+from personal_shopping_agent.infrastructure.storage.tables import (
     ShoppingRequestRecord,
     WorkflowEventRecord,
     WorkflowRecord,

@@ -7,7 +7,8 @@ from html.parser import HTMLParser
 from typing import ClassVar
 from urllib.parse import urlsplit
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.domain import StoreType
+from personal_shopping_agent.sourcing import (
     CollectedPage,
     PlatformAccessRestrictedError,
     PlatformCandidate,
@@ -16,8 +17,7 @@ from personal_shopping_agent.application import (
     PlatformSpecificationObservation,
     PlatformVariantOption,
 )
-from personal_shopping_agent.domain import StoreType
-from personal_shopping_agent.platforms.jd import (
+from personal_shopping_agent.sourcing.platforms.jd import (
     JD_ITEM_HOST,
     JD_PLATFORM,
     normalize_jd_item_url,

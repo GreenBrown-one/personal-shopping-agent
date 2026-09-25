@@ -7,14 +7,16 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
-from personal_shopping_agent.application.explanation import (
+from personal_shopping_agent.presentation.explanation import (
     ReportExplanationProvider,
     ReportExplanationRequestBuilder,
     ShoppingReportExplanationService,
     ShoppingReportPresentationService,
 )
-from personal_shopping_agent.llm.deepseek_adapter import DeepSeekReportExplanationAdapter
-from personal_shopping_agent.llm.openai_adapter import OpenAIReportExplanationAdapter
+from personal_shopping_agent.presentation.llm.deepseek_adapter import (
+    DeepSeekReportExplanationAdapter,
+)
+from personal_shopping_agent.presentation.llm.openai_adapter import OpenAIReportExplanationAdapter
 
 LLM_PROVIDER_ENV = "PERSONAL_SHOPPING_LLM_PROVIDER"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"

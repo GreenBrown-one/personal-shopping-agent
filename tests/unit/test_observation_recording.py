@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 from pydantic import HttpUrl
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.sourcing import (
     DetailObservation,
     PlatformCandidate,
     PlatformObservationKind,

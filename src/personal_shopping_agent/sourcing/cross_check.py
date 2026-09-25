@@ -9,7 +9,13 @@ from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import (
+    Evidence,
+    EvidenceSourceType,
+    EvidenceSubjectType,
+    Product,
+)
+from personal_shopping_agent.domain.workflow import (
     InvalidWorkflowTransitionError,
     ShoppingWorkflow,
     WorkflowEvent,
@@ -17,12 +23,6 @@ from personal_shopping_agent.application.workflow import (
     WorkflowState,
     WorkflowStateMachine,
     workflow_now,
-)
-from personal_shopping_agent.domain import (
-    Evidence,
-    EvidenceSourceType,
-    EvidenceSubjectType,
-    Product,
 )
 
 

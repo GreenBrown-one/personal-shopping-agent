@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 from pydantic import HttpUrl
 
-from personal_shopping_agent.application import PlatformAccessRestrictedError
-from personal_shopping_agent.platforms import JDSearchAdapter
-from personal_shopping_agent.platforms.jd import normalize_jd_item_url
+from personal_shopping_agent.sourcing import (
+    PlatformAccessRestrictedError,
+)
+from personal_shopping_agent.sourcing.platforms import JDSearchAdapter
+from personal_shopping_agent.sourcing.platforms.jd import normalize_jd_item_url
 
 CAPTURED_AT = datetime(2026, 8, 9, 13, 0, tzinfo=UTC)
 FIXTURE_PATH = Path(__file__).parents[1] / "fixtures" / "jd" / "search_results.html"

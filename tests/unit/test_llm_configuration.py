@@ -6,13 +6,13 @@ from typing import Any
 import pytest
 from pydantic import SecretStr, ValidationError
 
-import personal_shopping_agent.llm.config as config_module
-from personal_shopping_agent.application import (
+import personal_shopping_agent.presentation.llm.config as config_module
+from personal_shopping_agent.presentation import (
     ReportExplanationRequest,
     ShoppingReportExplanation,
     ShoppingReportPresentationService,
 )
-from personal_shopping_agent.llm import (
+from personal_shopping_agent.presentation.llm import (
     ExplanationProviderKind,
     LLMConfigurationError,
     LLMConfigurationErrorCode,
@@ -22,7 +22,7 @@ from personal_shopping_agent.llm import (
     create_report_presentation_service_from_environment,
     load_llm_explanation_settings,
 )
-from personal_shopping_agent.llm.config import (
+from personal_shopping_agent.presentation.llm.config import (
     DEEPSEEK_API_KEY_ENV,
     DEEPSEEK_MODEL_ENV,
     LLM_CANDIDATES_ENV,

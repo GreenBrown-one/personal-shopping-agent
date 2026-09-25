@@ -11,18 +11,8 @@ from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from personal_shopping_agent.application.confidence import (
-    CandidateEvidenceConfidence,
-    EvidenceConfidenceEvaluator,
-)
-from personal_shopping_agent.application.cross_check import EvidenceCheck
-from personal_shopping_agent.application.decision import (
-    CandidateScoringFoundation,
-    CandidateScoringFoundationBuilder,
-    OfferCostAssessment,
-)
-from personal_shopping_agent.application.normalization import NormalizedSpecification
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import Evidence, Money, Offer, Product, ShoppingRequest
+from personal_shopping_agent.domain.workflow import (
     InvalidWorkflowTransitionError,
     ShoppingWorkflow,
     WorkflowEvent,
@@ -31,7 +21,17 @@ from personal_shopping_agent.application.workflow import (
     WorkflowStateMachine,
     workflow_now,
 )
-from personal_shopping_agent.domain import Evidence, Money, Offer, Product, ShoppingRequest
+from personal_shopping_agent.presentation.confidence import (
+    CandidateEvidenceConfidence,
+    EvidenceConfidenceEvaluator,
+)
+from personal_shopping_agent.presentation.decision import (
+    CandidateScoringFoundation,
+    CandidateScoringFoundationBuilder,
+    OfferCostAssessment,
+)
+from personal_shopping_agent.sourcing.cross_check import EvidenceCheck
+from personal_shopping_agent.sourcing.normalization import NormalizedSpecification
 
 _SCORE_QUANTUM = Decimal("0.000001")
 _INDEX_QUANTUM = Decimal("0.000000000001")

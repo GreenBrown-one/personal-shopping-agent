@@ -5,20 +5,22 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application import (
-    DetailObservation,
-    SearchObservation,
+from personal_shopping_agent.domain import (
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
 )
-from personal_shopping_agent.storage.observation_repository import (
+from personal_shopping_agent.infrastructure.storage.observation_repository import (
     detail_observation_record,
     search_observation_record,
 )
-from personal_shopping_agent.storage.workflow_repository import (
+from personal_shopping_agent.infrastructure.storage.workflow_repository import (
     apply_workflow_transition,
     load_workflow_snapshot,
+)
+from personal_shopping_agent.sourcing import (
+    DetailObservation,
+    SearchObservation,
 )
 
 

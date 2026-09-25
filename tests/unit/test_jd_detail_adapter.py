@@ -6,14 +6,14 @@ from pathlib import Path
 import pytest
 from pydantic import HttpUrl
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.domain import StoreType
+from personal_shopping_agent.sourcing import (
     PlatformAccessRestrictedError,
     PlatformCandidate,
     PlatformDetailParseError,
 )
-from personal_shopping_agent.domain import StoreType
-from personal_shopping_agent.platforms import JDDetailAdapter
-from personal_shopping_agent.platforms.jd_detail import (
+from personal_shopping_agent.sourcing.platforms import JDDetailAdapter
+from personal_shopping_agent.sourcing.platforms.jd_detail import (
     classify_jd_store,
     normalize_jd_stock,
 )

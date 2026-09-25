@@ -6,8 +6,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from personal_shopping_agent.application.details import PlatformProductDetail
-from personal_shopping_agent.application.discovery import PlatformSearchResult
+from personal_shopping_agent.sourcing.details import PlatformProductDetail
+from personal_shopping_agent.sourcing.discovery import PlatformSearchResult
 
 
 class PlatformObservationKind(StrEnum):

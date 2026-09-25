@@ -7,7 +7,7 @@ from html.parser import HTMLParser
 from typing import ClassVar
 from urllib.parse import urlencode, urlsplit
 
-from personal_shopping_agent.application.discovery import (
+from personal_shopping_agent.sourcing.discovery import (
     CollectedPage,
     PlatformAccessRestrictedError,
     PlatformCandidate,

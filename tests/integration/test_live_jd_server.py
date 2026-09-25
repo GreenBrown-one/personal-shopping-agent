@@ -6,18 +6,18 @@ from pathlib import Path
 import pytest
 from mcp import Client
 
-from personal_shopping_agent.browser import StatusPage
-from personal_shopping_agent.mcp import (
-    create_live_jd_server,
-    create_live_jd_server_for_database,
-)
-from personal_shopping_agent.runtime_settings import (
+from personal_shopping_agent.infrastructure.settings import (
     DATABASE_URL_ENV,
     LIVE_JD_ACCESS_ENV,
     LIVE_JD_HEADLESS_ENV,
     LiveJDConfigurationError,
 )
-from personal_shopping_agent.storage import upgrade_database
+from personal_shopping_agent.infrastructure.storage import upgrade_database
+from personal_shopping_agent.interfaces.mcp import (
+    create_live_jd_server,
+    create_live_jd_server_for_database,
+)
+from personal_shopping_agent.sourcing.browser import StatusPage
 
 
 class FakeManagedCollector:

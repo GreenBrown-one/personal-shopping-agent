@@ -6,19 +6,19 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from personal_shopping_agent.application.cross_check import EvidenceCheck, EvidenceCheckStatus
-from personal_shopping_agent.application.decision import (
-    CandidateScoringFoundation,
-    CriterionEvaluation,
-    CriterionEvaluationStatus,
-)
-from personal_shopping_agent.application.normalization import NormalizedSpecification
 from personal_shopping_agent.domain import (
     Evidence,
     EvidenceSourceType,
     EvidenceSubjectType,
     ShoppingRequest,
 )
+from personal_shopping_agent.presentation.decision import (
+    CandidateScoringFoundation,
+    CriterionEvaluation,
+    CriterionEvaluationStatus,
+)
+from personal_shopping_agent.sourcing.cross_check import EvidenceCheck, EvidenceCheckStatus
+from personal_shopping_agent.sourcing.normalization import NormalizedSpecification
 
 _SCORE_QUANTUM = Decimal("0.000001")
 _ZERO = Decimal("0")

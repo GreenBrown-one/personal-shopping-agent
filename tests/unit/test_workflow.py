@@ -6,14 +6,16 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.automation import (
+    next_workflow_state,
+)
+from personal_shopping_agent.domain import (
     InvalidWorkflowTransitionError,
     ShoppingWorkflow,
     WorkflowState,
     WorkflowStateMachine,
-    next_workflow_state,
 )
-from personal_shopping_agent.application.workflow import workflow_now
+from personal_shopping_agent.domain.workflow import workflow_now
 
 OCCURRED_AT = datetime(2026, 8, 9, 11, 0, tzinfo=UTC)
 

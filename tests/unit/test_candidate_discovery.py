@@ -6,8 +6,10 @@ from pathlib import Path
 
 from pydantic import HttpUrl
 
-from personal_shopping_agent.application import CandidateDiscoveryService
-from personal_shopping_agent.platforms import JDSearchAdapter
+from personal_shopping_agent.sourcing import (
+    CandidateDiscoveryService,
+)
+from personal_shopping_agent.sourcing.platforms import JDSearchAdapter
 
 CAPTURED_AT = datetime(2026, 8, 9, 13, 0, tzinfo=UTC)
 FIXTURE_PATH = Path(__file__).parents[1] / "fixtures" / "jd" / "search_results.html"

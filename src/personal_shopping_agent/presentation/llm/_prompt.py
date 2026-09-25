@@ -4,7 +4,7 @@
 
 import json
 
-from personal_shopping_agent.application.explanation import ReportExplanationRequest
+from personal_shopping_agent.presentation.explanation import ReportExplanationRequest
 
 SYSTEM_PROMPT = (
     "你是购物比较报告的受约束解释器。\n"

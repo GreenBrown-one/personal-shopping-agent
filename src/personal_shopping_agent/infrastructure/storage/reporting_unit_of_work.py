@@ -6,26 +6,26 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application.ranking import CandidateScore
-from personal_shopping_agent.application.reporting import RenderedShoppingReport
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import Evidence, Offer, Product
+from personal_shopping_agent.domain.workflow import (
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
 )
-from personal_shopping_agent.domain import Evidence, Offer, Product
-from personal_shopping_agent.storage.repository import domain_payload
-from personal_shopping_agent.storage.tables import (
+from personal_shopping_agent.infrastructure.storage.repository import domain_payload
+from personal_shopping_agent.infrastructure.storage.tables import (
     CandidateScoreRecord,
     EvidenceRecord,
     OfferRecord,
     ProductRecord,
     ShoppingReportRecord,
 )
-from personal_shopping_agent.storage.workflow_repository import (
+from personal_shopping_agent.infrastructure.storage.workflow_repository import (
     apply_workflow_transition,
     load_workflow_snapshot,
 )
+from personal_shopping_agent.presentation.ranking import CandidateScore
+from personal_shopping_agent.presentation.reporting import RenderedShoppingReport
 
 
 def shopping_report_record(rendered: RenderedShoppingReport) -> ShoppingReportRecord:

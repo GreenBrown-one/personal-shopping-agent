@@ -12,7 +12,7 @@ from uuid import UUID
 import pytest
 
 from personal_shopping_agent import __version__
-from personal_shopping_agent.application import (
+from personal_shopping_agent.automation import (
     ARCHIVE_FORMAT,
     ArchiveTargetExistsError,
     ArchiveWriteError,
@@ -23,12 +23,16 @@ from personal_shopping_agent.application import (
     WorkflowDataSnapshot,
     WorkflowDeletionConfirmationError,
     WorkflowDeletionPlan,
-    WorkflowStateMachine,
     deletion_confirmation_token,
 )
-from personal_shopping_agent.application.workflow import WorkflowSnapshot
-from personal_shopping_agent.domain import Budget, Money, ShoppingRequest
-from personal_shopping_agent.storage import LocalJsonWorkflowArchiveWriter
+from personal_shopping_agent.domain import (
+    Budget,
+    Money,
+    ShoppingRequest,
+    WorkflowStateMachine,
+)
+from personal_shopping_agent.domain.workflow import WorkflowSnapshot
+from personal_shopping_agent.infrastructure.storage import LocalJsonWorkflowArchiveWriter
 
 NOW = datetime(2026, 8, 10, 2, 0, tzinfo=UTC)
 

@@ -12,14 +12,14 @@ from uuid import UUID
 from pydantic import AwareDatetime, ConfigDict, Field
 
 from personal_shopping_agent.__about__ import __version__
-from personal_shopping_agent.application.cross_check import EvidenceCheck
-from personal_shopping_agent.application.normalization import NormalizedSpecification
-from personal_shopping_agent.application.observations import DetailObservation, SearchObservation
-from personal_shopping_agent.application.ranking import CandidateScore
-from personal_shopping_agent.application.reporting import RenderedShoppingReport
-from personal_shopping_agent.application.workflow import WorkflowSnapshot, workflow_now
 from personal_shopping_agent.domain import Evidence, Offer, Product
-from personal_shopping_agent.serialization import JsonContractModel
+from personal_shopping_agent.domain.serialization import JsonContractModel
+from personal_shopping_agent.domain.workflow import WorkflowSnapshot, workflow_now
+from personal_shopping_agent.presentation.ranking import CandidateScore
+from personal_shopping_agent.presentation.reporting import RenderedShoppingReport
+from personal_shopping_agent.sourcing.cross_check import EvidenceCheck
+from personal_shopping_agent.sourcing.normalization import NormalizedSpecification
+from personal_shopping_agent.sourcing.observations import DetailObservation, SearchObservation
 
 ARCHIVE_FORMAT = "personal-shopping-agent.workflow-data.v1"
 EXPORT_PRIVACY_WARNING = (

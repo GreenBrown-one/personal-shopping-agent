@@ -14,8 +14,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application.cross_check import EvidenceCheck
-from personal_shopping_agent.application.data_lifecycle import (
+from personal_shopping_agent.automation.data_lifecycle import (
     WorkflowDataIntegrityError,
     WorkflowDataOwnershipError,
     WorkflowDataSnapshot,
@@ -23,17 +22,9 @@ from personal_shopping_agent.application.data_lifecycle import (
     WorkflowDeletionPlanStaleError,
     deletion_confirmation_token,
 )
-from personal_shopping_agent.application.normalization import NormalizedSpecification
-from personal_shopping_agent.application.observations import (
-    DetailObservation,
-    PlatformObservationKind,
-    SearchObservation,
-)
-from personal_shopping_agent.application.ranking import CandidateScore
-from personal_shopping_agent.application.reporting import RenderedShoppingReport
 from personal_shopping_agent.domain import Evidence, EvidenceSubjectType, Offer, Product
-from personal_shopping_agent.storage.repository import EntityNotFoundError
-from personal_shopping_agent.storage.tables import (
+from personal_shopping_agent.infrastructure.storage.repository import EntityNotFoundError
+from personal_shopping_agent.infrastructure.storage.tables import (
     CandidateScoreRecord,
     EvidenceCheckRecord,
     EvidenceRecord,
@@ -45,7 +36,18 @@ from personal_shopping_agent.storage.tables import (
     ShoppingRequestRecord,
     WorkflowRecord,
 )
-from personal_shopping_agent.storage.workflow_repository import load_workflow_snapshot
+from personal_shopping_agent.infrastructure.storage.workflow_repository import (
+    load_workflow_snapshot,
+)
+from personal_shopping_agent.presentation.ranking import CandidateScore
+from personal_shopping_agent.presentation.reporting import RenderedShoppingReport
+from personal_shopping_agent.sourcing.cross_check import EvidenceCheck
+from personal_shopping_agent.sourcing.normalization import NormalizedSpecification
+from personal_shopping_agent.sourcing.observations import (
+    DetailObservation,
+    PlatformObservationKind,
+    SearchObservation,
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -7,18 +7,6 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from personal_shopping_agent.application import (
-    CandidateScoringFoundation,
-    CandidateScoringFoundationBuilder,
-    CriterionEvaluation,
-    CriterionEvaluationStatus,
-    CriterionEvaluator,
-    InvalidCriterionDefinitionError,
-    NormalizedSpecification,
-    OfferCostAssessment,
-    OfferCostEstimator,
-    SpecificationNormalizationStatus,
-)
 from personal_shopping_agent.domain import (
     Budget,
     Money,
@@ -29,6 +17,20 @@ from personal_shopping_agent.domain import (
     ShoppingCriterion,
     ShoppingRequest,
     StoreType,
+)
+from personal_shopping_agent.presentation import (
+    CandidateScoringFoundation,
+    CandidateScoringFoundationBuilder,
+    CriterionEvaluation,
+    CriterionEvaluationStatus,
+    CriterionEvaluator,
+    InvalidCriterionDefinitionError,
+    OfferCostAssessment,
+    OfferCostEstimator,
+)
+from personal_shopping_agent.sourcing import (
+    NormalizedSpecification,
+    SpecificationNormalizationStatus,
 )
 
 NOW = datetime(2026, 8, 9, 22, 0, tzinfo=UTC)

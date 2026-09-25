@@ -11,24 +11,28 @@ from mcp import Client
 from mcp.types import TextContent
 from pydantic import ValidationError
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.automation import (
     PIPELINE_STATE_SEQUENCE,
-    RenderedShoppingReport,
     ShoppingPipelineOptions,
     ShoppingPipelineResult,
     ShoppingWorkflowService,
+)
+from personal_shopping_agent.domain import (
     WorkflowSnapshot,
     WorkflowState,
 )
-from personal_shopping_agent.browser import BrowserSnapshot
-from personal_shopping_agent.mcp import create_jd_pipeline_server_for_database
-from personal_shopping_agent.runtime import NoOfficialEvidenceProvider
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     SQLiteWorkflowRepository,
     create_schema,
     create_session_factory,
     create_sqlite_engine,
 )
+from personal_shopping_agent.interfaces.composition import NoOfficialEvidenceProvider
+from personal_shopping_agent.interfaces.mcp import create_jd_pipeline_server_for_database
+from personal_shopping_agent.presentation import (
+    RenderedShoppingReport,
+)
+from personal_shopping_agent.sourcing.browser import BrowserSnapshot
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "jd"
 

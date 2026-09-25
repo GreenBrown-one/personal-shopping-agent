@@ -13,7 +13,27 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.domain import (
+    Budget,
+    Evidence,
+    EvidenceSourceType,
+    EvidenceSubjectType,
+    InvalidWorkflowTransitionError,
+    Money,
+    Offer,
+    PriceBreakdown,
+    PriceKind,
+    Product,
+    ShoppingCriterion,
+    ShoppingRequest,
+    ShoppingWorkflow,
+    StoreType,
+    WorkflowEvent,
+    WorkflowSnapshot,
+    WorkflowState,
+    WorkflowStateMachine,
+)
+from personal_shopping_agent.presentation import (
     BudgetStatus,
     CandidateDecisionInput,
     CandidateEvidenceConfidence,
@@ -30,7 +50,6 @@ from personal_shopping_agent.application import (
     ExplanationStatement,
     ExplanationStatus,
     InvalidExplanationOutputError,
-    InvalidWorkflowTransitionError,
     MarkdownShoppingReportExplanationRenderer,
     MarkdownShoppingReportRenderer,
     NoCandidateScoresForReportError,
@@ -50,28 +69,9 @@ from personal_shopping_agent.application import (
     ShoppingReportExplanationService,
     ShoppingReportPresentationService,
     ShoppingReportService,
-    ShoppingWorkflow,
-    WorkflowEvent,
-    WorkflowSnapshot,
-    WorkflowState,
-    WorkflowStateMachine,
     validate_explanation_scope,
 )
-from personal_shopping_agent.domain import (
-    Budget,
-    Evidence,
-    EvidenceSourceType,
-    EvidenceSubjectType,
-    Money,
-    Offer,
-    PriceBreakdown,
-    PriceKind,
-    Product,
-    ShoppingCriterion,
-    ShoppingRequest,
-    StoreType,
-)
-from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
+from personal_shopping_agent.presentation.rendering import HtmlShoppingReportRenderer
 
 NOW = datetime(2026, 8, 10, 2, 0, tzinfo=UTC)
 GENERATED_AT = NOW + timedelta(seconds=1)

@@ -5,7 +5,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from personal_shopping_agent.application import ShoppingPipelineOptions
+from personal_shopping_agent.automation import (
+    ShoppingPipelineOptions,
+)
 from personal_shopping_agent.domain import (
     Budget,
     Money,

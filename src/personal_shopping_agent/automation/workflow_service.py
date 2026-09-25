@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import ShoppingRequest
+from personal_shopping_agent.domain.workflow import (
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
@@ -13,7 +14,6 @@ from personal_shopping_agent.application.workflow import (
     WorkflowStateMachine,
     workflow_now,
 )
-from personal_shopping_agent.domain import ShoppingRequest
 
 
 class WorkflowRepository(Protocol):

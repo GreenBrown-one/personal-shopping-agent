@@ -7,8 +7,8 @@ from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
-from personal_shopping_agent.domain import ShoppingRequest
-from personal_shopping_agent.serialization import JsonContractModel
+from personal_shopping_agent.domain.models import ShoppingRequest
+from personal_shopping_agent.domain.serialization import JsonContractModel
 
 
 class WorkflowState(StrEnum):

@@ -6,13 +6,13 @@ from typing import Protocol, cast
 from openai import OpenAI, OpenAIError
 from pydantic import ValidationError
 
-from personal_shopping_agent.application.explanation import (
+from personal_shopping_agent.presentation.explanation import (
     ExplanationFallbackReason,
     ReportExplanationProviderError,
     ReportExplanationRequest,
     ShoppingReportExplanation,
 )
-from personal_shopping_agent.llm._prompt import explanation_messages
+from personal_shopping_agent.presentation.llm._prompt import explanation_messages
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 

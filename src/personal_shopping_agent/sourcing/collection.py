@@ -8,16 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from personal_shopping_agent.application.details import PlatformProductDetail
-from personal_shopping_agent.application.discovery import (
-    PlatformCandidate,
-    PlatformSearchResult,
-)
-from personal_shopping_agent.application.observations import (
-    DetailObservation,
-    SearchObservation,
-)
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain.workflow import (
     InvalidWorkflowTransitionError,
     ShoppingWorkflow,
     WorkflowEvent,
@@ -25,6 +16,15 @@ from personal_shopping_agent.application.workflow import (
     WorkflowState,
     WorkflowStateMachine,
     workflow_now,
+)
+from personal_shopping_agent.sourcing.details import PlatformProductDetail
+from personal_shopping_agent.sourcing.discovery import (
+    PlatformCandidate,
+    PlatformSearchResult,
+)
+from personal_shopping_agent.sourcing.observations import (
+    DetailObservation,
+    SearchObservation,
 )
 
 

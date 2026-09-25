@@ -5,11 +5,11 @@ from typing import cast
 
 import pytest
 
-from personal_shopping_agent.host_config import (
+from personal_shopping_agent.infrastructure.settings import LIVE_JD_ACCESS_ENV
+from personal_shopping_agent.interfaces.host_config import (
     SourceCheckoutError,
     build_source_mcp_configuration,
 )
-from personal_shopping_agent.runtime_settings import LIVE_JD_ACCESS_ENV
 
 
 def _checkout(tmp_path: Path) -> Path:

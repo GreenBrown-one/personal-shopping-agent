@@ -12,7 +12,8 @@ from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from personal_shopping_agent.application.workflow import (
+from personal_shopping_agent.domain import Evidence, EvidenceSubjectType, Product
+from personal_shopping_agent.domain.workflow import (
     InvalidWorkflowTransitionError,
     ShoppingWorkflow,
     WorkflowEvent,
@@ -21,7 +22,6 @@ from personal_shopping_agent.application.workflow import (
     WorkflowStateMachine,
     workflow_now,
 )
-from personal_shopping_agent.domain import Evidence, EvidenceSubjectType, Product
 
 _MEASUREMENT_PATTERN = re.compile(
     r"^(?P<number>(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(?P<unit>[^\d\s].*?)$"

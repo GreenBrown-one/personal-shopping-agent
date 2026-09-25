@@ -5,7 +5,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from personal_shopping_agent.application.observations import DetailObservation
 from personal_shopping_agent.domain import (
     Evidence,
     EvidenceSourceType,
@@ -17,6 +16,7 @@ from personal_shopping_agent.domain import (
     ShoppingRequest,
     StoreType,
 )
+from personal_shopping_agent.sourcing.observations import DetailObservation
 
 
 class ConvertedDetailBatch(BaseModel):

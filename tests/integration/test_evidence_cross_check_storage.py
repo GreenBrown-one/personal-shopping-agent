@@ -11,17 +11,8 @@ from pydantic import HttpUrl
 from sqlalchemy import Engine, event, func, select
 from sqlalchemy.exc import IntegrityError
 
-from personal_shopping_agent.application import (
-    EvidenceCheck,
-    EvidenceCrossCheckBatch,
-    EvidenceCrossCheckService,
-    OfficialEvidenceIdentityMismatchError,
-    OfficialProductObservation,
-    OfficialSpecificationObservation,
-    ProductEvidenceChecker,
+from personal_shopping_agent.automation import (
     ShoppingWorkflowService,
-    WorkflowSnapshot,
-    WorkflowState,
 )
 from personal_shopping_agent.domain import (
     Budget,
@@ -31,8 +22,10 @@ from personal_shopping_agent.domain import (
     Money,
     Product,
     ShoppingRequest,
+    WorkflowSnapshot,
+    WorkflowState,
 )
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     SQLiteEvidenceCrossCheckUnitOfWork,
     SQLiteShoppingRepository,
     SQLiteWorkflowRepository,
@@ -40,7 +33,19 @@ from personal_shopping_agent.storage import (
     create_session_factory,
     create_sqlite_engine,
 )
-from personal_shopping_agent.storage.tables import EvidenceCheckRecord, EvidenceRecord
+from personal_shopping_agent.infrastructure.storage.tables import (
+    EvidenceCheckRecord,
+    EvidenceRecord,
+)
+from personal_shopping_agent.sourcing import (
+    EvidenceCheck,
+    EvidenceCrossCheckBatch,
+    EvidenceCrossCheckService,
+    OfficialEvidenceIdentityMismatchError,
+    OfficialProductObservation,
+    OfficialSpecificationObservation,
+    ProductEvidenceChecker,
+)
 
 NOW = datetime(2026, 8, 9, 19, 0, tzinfo=UTC)
 

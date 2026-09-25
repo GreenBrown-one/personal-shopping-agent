@@ -9,30 +9,30 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from personal_shopping_agent.application import (
-    EvidenceCheck,
-    EvidenceCheckStatus,
-    EvidenceCrossCheckService,
+from personal_shopping_agent.domain import (
+    Budget,
+    Evidence,
+    EvidenceSourceType,
+    EvidenceSubjectType,
     InvalidWorkflowTransitionError,
-    NoProductsForEvidenceCheckError,
-    OfficialEvidenceIdentityMismatchError,
-    OfficialProductObservation,
-    OfficialSpecificationObservation,
-    ProductEvidenceChecker,
+    Money,
+    Product,
+    ShoppingRequest,
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
     WorkflowState,
     WorkflowStateMachine,
 )
-from personal_shopping_agent.domain import (
-    Budget,
-    Evidence,
-    EvidenceSourceType,
-    EvidenceSubjectType,
-    Money,
-    Product,
-    ShoppingRequest,
+from personal_shopping_agent.sourcing import (
+    EvidenceCheck,
+    EvidenceCheckStatus,
+    EvidenceCrossCheckService,
+    NoProductsForEvidenceCheckError,
+    OfficialEvidenceIdentityMismatchError,
+    OfficialProductObservation,
+    OfficialSpecificationObservation,
+    ProductEvidenceChecker,
 )
 
 NOW = datetime(2026, 8, 9, 19, 0, tzinfo=UTC)

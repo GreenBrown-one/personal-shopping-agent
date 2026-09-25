@@ -5,19 +5,19 @@ from uuid import UUID
 
 from pydantic import ConfigDict, Field, model_validator
 
-from personal_shopping_agent.application.collection import SearchDetailCollectionService
-from personal_shopping_agent.application.cross_check import EvidenceCrossCheckService
-from personal_shopping_agent.application.ingestion import OfferIngestionService
-from personal_shopping_agent.application.normalization import SpecificationNormalizationService
-from personal_shopping_agent.application.ranking import CandidateScoringService
-from personal_shopping_agent.application.report_access import ShoppingReportReader
-from personal_shopping_agent.application.reporting import (
+from personal_shopping_agent.automation.workflow_service import ShoppingWorkflowService
+from personal_shopping_agent.domain.serialization import JsonContractModel
+from personal_shopping_agent.domain.workflow import WorkflowSnapshot, WorkflowState
+from personal_shopping_agent.presentation.ranking import CandidateScoringService
+from personal_shopping_agent.presentation.report_access import ShoppingReportReader
+from personal_shopping_agent.presentation.reporting import (
     RenderedShoppingReport,
     ShoppingReportService,
 )
-from personal_shopping_agent.application.service import ShoppingWorkflowService
-from personal_shopping_agent.application.workflow import WorkflowSnapshot, WorkflowState
-from personal_shopping_agent.serialization import JsonContractModel
+from personal_shopping_agent.sourcing.collection import SearchDetailCollectionService
+from personal_shopping_agent.sourcing.cross_check import EvidenceCrossCheckService
+from personal_shopping_agent.sourcing.ingestion import OfferIngestionService
+from personal_shopping_agent.sourcing.normalization import SpecificationNormalizationService
 
 PIPELINE_STATE_SEQUENCE = (
     WorkflowState.REQUEST_VALIDATED,

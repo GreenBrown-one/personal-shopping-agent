@@ -6,7 +6,15 @@ from decimal import Decimal
 import pytest
 from pydantic import HttpUrl
 
-from personal_shopping_agent.application import (
+from personal_shopping_agent.domain import (
+    Budget,
+    EvidenceSourceType,
+    EvidenceSubjectType,
+    Money,
+    ShoppingRequest,
+    StoreType,
+)
+from personal_shopping_agent.sourcing import (
     DetailConversionError,
     DetailObservation,
     DetailObservationConverter,
@@ -15,14 +23,6 @@ from personal_shopping_agent.application import (
     PlatformSpecificationObservation,
     PlatformVariantOption,
     evidence_source_for_store,
-)
-from personal_shopping_agent.domain import (
-    Budget,
-    EvidenceSourceType,
-    EvidenceSubjectType,
-    Money,
-    ShoppingRequest,
-    StoreType,
 )
 
 NOW = datetime(2026, 8, 9, 17, 0, tzinfo=UTC)

@@ -8,29 +8,29 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from personal_shopping_agent.application import (
-    InvalidWorkflowTransitionError,
-    NormalizedSpecification,
-    NoSpecificationsForNormalizationError,
-    ProductSpecificationNormalizer,
-    ShoppingWorkflow,
-    SpecificationNormalizationService,
-    SpecificationNormalizationStatus,
-    WorkflowEvent,
-    WorkflowSnapshot,
-    WorkflowState,
-    WorkflowStateMachine,
-    measurement_definition,
-    normalize_measurement,
-)
 from personal_shopping_agent.domain import (
     Budget,
     Evidence,
     EvidenceSourceType,
     EvidenceSubjectType,
+    InvalidWorkflowTransitionError,
     Money,
     Product,
     ShoppingRequest,
+    ShoppingWorkflow,
+    WorkflowEvent,
+    WorkflowSnapshot,
+    WorkflowState,
+    WorkflowStateMachine,
+)
+from personal_shopping_agent.sourcing import (
+    NormalizedSpecification,
+    NoSpecificationsForNormalizationError,
+    ProductSpecificationNormalizer,
+    SpecificationNormalizationService,
+    SpecificationNormalizationStatus,
+    measurement_definition,
+    normalize_measurement,
 )
 
 NOW = datetime(2026, 8, 9, 21, 0, tzinfo=UTC)

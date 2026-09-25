@@ -9,15 +9,8 @@ from pydantic import HttpUrl, ValidationError
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application import (
-    DetailObservation,
-    PlatformCandidate,
-    PlatformProductDetail,
-    PlatformSearchResult,
-    SearchObservation,
-)
 from personal_shopping_agent.domain import Budget, Money, ShoppingRequest
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     DuplicateEntityError,
     EntityNotFoundError,
     InvalidReferenceError,
@@ -29,7 +22,14 @@ from personal_shopping_agent.storage import (
     create_sqlite_engine,
     session_scope,
 )
-from personal_shopping_agent.storage.tables import PlatformObservationRecord
+from personal_shopping_agent.infrastructure.storage.tables import PlatformObservationRecord
+from personal_shopping_agent.sourcing import (
+    DetailObservation,
+    PlatformCandidate,
+    PlatformProductDetail,
+    PlatformSearchResult,
+    SearchObservation,
+)
 
 CAPTURED_AT = datetime(2026, 8, 9, 15, 0, tzinfo=UTC)
 

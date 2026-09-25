@@ -11,14 +11,14 @@ from uuid import UUID
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
-from personal_shopping_agent.application.reporting import (
+from personal_shopping_agent.domain import Money
+from personal_shopping_agent.domain.serialization import JsonContractModel
+from personal_shopping_agent.presentation.reporting import (
     RenderedShoppingReport,
     ReportCandidate,
     ReportFormat,
     escape_markdown,
 )
-from personal_shopping_agent.domain import Money
-from personal_shopping_agent.serialization import JsonContractModel
 
 EXPLANATION_SCHEMA_VERSION = "m5-explanation-v1"
 DISCLAIMER_FACT_ID = "report.disclaimer"

@@ -10,7 +10,8 @@ from typing import Any, cast
 import pytest
 from playwright.async_api import Error as PlaywrightError
 
-from personal_shopping_agent.browser import (
+from personal_shopping_agent.infrastructure.local_security import LocalFileSecurityError
+from personal_shopping_agent.sourcing.browser import (
     BrowserManager,
     BrowserManagerError,
     BrowserManagerSettings,
@@ -18,8 +19,7 @@ from personal_shopping_agent.browser import (
     NavigationPolicy,
     NavigationPolicyError,
 )
-from personal_shopping_agent.browser.manager import PlaywrightFactory
-from personal_shopping_agent.local_security import LocalFileSecurityError
+from personal_shopping_agent.sourcing.browser.manager import PlaywrightFactory
 
 CAPTURED_AT = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 
@@ -311,7 +311,7 @@ def test_screenshot_failures_are_sanitized_and_remove_partial_files(
         raise LocalFileSecurityError("raw local path detail")
 
     monkeypatch.setattr(
-        "personal_shopping_agent.browser.manager.secure_existing_private_file",
+        "personal_shopping_agent.sourcing.browser.manager.secure_existing_private_file",
         fail_security,
     )
 

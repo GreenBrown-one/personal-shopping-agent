@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-import personal_shopping_agent.local_security as security_module
-from personal_shopping_agent.local_security import (
+import personal_shopping_agent.infrastructure.local_security as security_module
+from personal_shopping_agent.infrastructure.local_security import (
     LocalFileSecurityError,
     inspect_private_file,
     prepare_private_file,

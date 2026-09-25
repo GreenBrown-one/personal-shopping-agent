@@ -6,23 +6,27 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application import (
-    DetailObservation,
-    PlatformObservationKind,
+from personal_shopping_agent.domain import (
+    Evidence,
+    Offer,
+    Product,
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
 )
-from personal_shopping_agent.domain import Evidence, Offer, Product
-from personal_shopping_agent.storage.repository import (
+from personal_shopping_agent.infrastructure.storage.repository import (
     evidence_record,
     offer_record,
     product_record,
 )
-from personal_shopping_agent.storage.tables import PlatformObservationRecord
-from personal_shopping_agent.storage.workflow_repository import (
+from personal_shopping_agent.infrastructure.storage.tables import PlatformObservationRecord
+from personal_shopping_agent.infrastructure.storage.workflow_repository import (
     apply_workflow_transition,
     load_workflow_snapshot,
+)
+from personal_shopping_agent.sourcing import (
+    DetailObservation,
+    PlatformObservationKind,
 )
 
 

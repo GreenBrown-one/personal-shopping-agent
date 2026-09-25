@@ -14,16 +14,6 @@ from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
-from personal_shopping_agent.application.ranking import CandidateRankingBatch, CandidateScore
-from personal_shopping_agent.application.workflow import (
-    InvalidWorkflowTransitionError,
-    ShoppingWorkflow,
-    WorkflowEvent,
-    WorkflowSnapshot,
-    WorkflowState,
-    WorkflowStateMachine,
-    workflow_now,
-)
 from personal_shopping_agent.domain import (
     Evidence,
     EvidenceSubjectType,
@@ -32,7 +22,17 @@ from personal_shopping_agent.domain import (
     Product,
     ShoppingRequest,
 )
-from personal_shopping_agent.serialization import JsonContractModel
+from personal_shopping_agent.domain.serialization import JsonContractModel
+from personal_shopping_agent.domain.workflow import (
+    InvalidWorkflowTransitionError,
+    ShoppingWorkflow,
+    WorkflowEvent,
+    WorkflowSnapshot,
+    WorkflowState,
+    WorkflowStateMachine,
+    workflow_now,
+)
+from personal_shopping_agent.presentation.ranking import CandidateRankingBatch, CandidateScore
 
 REPORT_METHODOLOGY_VERSION = "m5-report-v1"
 REPORT_DISCLAIMER = (

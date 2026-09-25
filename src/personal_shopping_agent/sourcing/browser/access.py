@@ -9,11 +9,11 @@ from dataclasses import dataclass, field
 from typing import Protocol
 from urllib.parse import urlsplit
 
-from personal_shopping_agent.application.discovery import CollectedPage
-from personal_shopping_agent.browser.manager import (
+from personal_shopping_agent.sourcing.browser.manager import (
     BrowserManagerError,
     TransientBrowserManagerError,
 )
+from personal_shopping_agent.sourcing.discovery import CollectedPage
 
 MonotonicClock = Callable[[], float]
 AsyncSleeper = Callable[[float], Awaitable[None]]

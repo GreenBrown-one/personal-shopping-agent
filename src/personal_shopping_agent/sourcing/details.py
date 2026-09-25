@@ -5,12 +5,12 @@ from typing import Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl
 
-from personal_shopping_agent.application.discovery import (
+from personal_shopping_agent.domain import StoreType
+from personal_shopping_agent.sourcing.discovery import (
     CollectedPage,
     PageCollector,
     PlatformCandidate,
 )
-from personal_shopping_agent.domain import StoreType
 
 
 class DetailModel(BaseModel):

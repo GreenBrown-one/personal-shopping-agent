@@ -7,10 +7,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from personal_shopping_agent.application.normalization import (
-    NormalizedSpecification,
-    SpecificationNormalizationStatus,
-)
 from personal_shopping_agent.domain import (
     Money,
     Offer,
@@ -19,6 +15,10 @@ from personal_shopping_agent.domain import (
     ShoppingCriterion,
     ShoppingRequest,
     StoreType,
+)
+from personal_shopping_agent.sourcing.normalization import (
+    NormalizedSpecification,
+    SpecificationNormalizationStatus,
 )
 
 _SCORE_QUANTUM = Decimal("0.000001")

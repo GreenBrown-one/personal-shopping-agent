@@ -8,24 +8,24 @@ from uuid import UUID
 import pytest
 from pydantic import HttpUrl
 
-from personal_shopping_agent.application import (
-    DetailObservation,
+from personal_shopping_agent.domain import (
+    Budget,
+    Evidence,
     InvalidWorkflowTransitionError,
-    OfferIngestionService,
-    PlatformProductDetail,
+    Money,
+    Offer,
+    Product,
+    ShoppingRequest,
     ShoppingWorkflow,
     WorkflowEvent,
     WorkflowSnapshot,
     WorkflowState,
     WorkflowStateMachine,
 )
-from personal_shopping_agent.domain import (
-    Budget,
-    Evidence,
-    Money,
-    Offer,
-    Product,
-    ShoppingRequest,
+from personal_shopping_agent.sourcing import (
+    DetailObservation,
+    OfferIngestionService,
+    PlatformProductDetail,
 )
 
 NOW = datetime(2026, 8, 9, 18, 0, tzinfo=UTC)

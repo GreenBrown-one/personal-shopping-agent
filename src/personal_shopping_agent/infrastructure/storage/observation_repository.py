@@ -6,19 +6,19 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from personal_shopping_agent.application import (
-    DetailObservation,
-    PlatformObservationKind,
-    SearchObservation,
-)
-from personal_shopping_agent.storage.database import session_scope
-from personal_shopping_agent.storage.repository import (
+from personal_shopping_agent.infrastructure.storage.database import session_scope
+from personal_shopping_agent.infrastructure.storage.repository import (
     DuplicateEntityError,
     EntityNotFoundError,
     InvalidReferenceError,
     domain_payload,
 )
-from personal_shopping_agent.storage.tables import PlatformObservationRecord
+from personal_shopping_agent.infrastructure.storage.tables import PlatformObservationRecord
+from personal_shopping_agent.sourcing import (
+    DetailObservation,
+    PlatformObservationKind,
+    SearchObservation,
+)
 
 
 class ObservationKindMismatchError(ValueError):

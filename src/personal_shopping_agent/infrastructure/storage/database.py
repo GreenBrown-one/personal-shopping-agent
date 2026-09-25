@@ -9,7 +9,7 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from personal_shopping_agent.storage.tables import Base
+from personal_shopping_agent.infrastructure.storage.tables import Base
 
 
 def _enable_foreign_keys(dbapi_connection: object, _connection_record: object) -> None:

@@ -22,12 +22,12 @@ from playwright.async_api import (
 from playwright.async_api import Error as PlaywrightError
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, HttpUrl
 
-from personal_shopping_agent.browser.policy import NavigationPolicy, NavigationPolicyError
-from personal_shopping_agent.local_security import (
+from personal_shopping_agent.infrastructure.local_security import (
     LocalFileSecurityError,
     require_private_directory,
     secure_existing_private_file,
 )
+from personal_shopping_agent.sourcing.browser.policy import NavigationPolicy, NavigationPolicyError
 
 
 class BrowserManagerError(RuntimeError):

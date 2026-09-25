@@ -11,9 +11,9 @@ import httpx
 import pytest
 from openai import APIConnectionError, OpenAIError
 
-import personal_shopping_agent.llm.deepseek_adapter as deepseek_module
-import personal_shopping_agent.llm.openai_adapter as openai_module
-from personal_shopping_agent.application import (
+import personal_shopping_agent.presentation.llm.deepseek_adapter as deepseek_module
+import personal_shopping_agent.presentation.llm.openai_adapter as openai_module
+from personal_shopping_agent.presentation import (
     CandidateExplanation,
     ExplanationFact,
     ExplanationFallbackReason,
@@ -22,7 +22,7 @@ from personal_shopping_agent.application import (
     ReportExplanationRequest,
     ShoppingReportExplanation,
 )
-from personal_shopping_agent.llm import (
+from personal_shopping_agent.presentation.llm import (
     DeepSeekReportExplanationAdapter,
     OpenAIReportExplanationAdapter,
 )

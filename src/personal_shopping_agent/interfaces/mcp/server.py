@@ -10,53 +10,64 @@ from mcp.types import ToolAnnotations
 from sqlalchemy.orm import Session, sessionmaker
 
 from personal_shopping_agent.__about__ import __version__
-from personal_shopping_agent.application import (
-    OfficialEvidenceProvider,
-    PageCollector,
-    RenderedShoppingReport,
-    RenderedShoppingReportPresentation,
+from personal_shopping_agent.automation import (
     ShoppingDecisionPipelineService,
     ShoppingPipelineResult,
-    ShoppingReportAccessService,
-    ShoppingReportResult,
-    ShoppingReportService,
     ShoppingWorkflowService,
+)
+from personal_shopping_agent.domain import (
     WorkflowSnapshot,
 )
-from personal_shopping_agent.browser import (
-    BrowserManager,
-    BrowserManagerSettings,
-    ControlledPageCollector,
-    NavigationPolicy,
-    StatusPageCollector,
-)
-from personal_shopping_agent.llm import (
-    ExplanationProviderKind,
-    LLMExplanationSettings,
-    create_report_presentation_service,
-    load_llm_explanation_settings,
-)
-from personal_shopping_agent.mcp.schemas import (
-    AgentCapabilities,
-    RunShoppingPipelineInput,
-    StartShoppingWorkflowInput,
-)
-from personal_shopping_agent.platforms.jd import JD_ITEM_HOST, JD_SEARCH_HOST
-from personal_shopping_agent.rendering import HtmlShoppingReportRenderer
-from personal_shopping_agent.runtime import NoOfficialEvidenceProvider, create_jd_pipeline_service
-from personal_shopping_agent.runtime_settings import (
+from personal_shopping_agent.infrastructure.settings import (
     LiveJDConfigurationError,
     database_url_from_environment,
     load_live_jd_settings,
 )
-from personal_shopping_agent.storage import (
+from personal_shopping_agent.infrastructure.storage import (
     SQLiteShoppingReportRepository,
     SQLiteShoppingReportUnitOfWork,
     create_session_factory,
     create_sqlite_engine,
     require_current_database,
 )
-from personal_shopping_agent.storage.workflow_repository import SQLiteWorkflowRepository
+from personal_shopping_agent.infrastructure.storage.workflow_repository import (
+    SQLiteWorkflowRepository,
+)
+from personal_shopping_agent.interfaces.composition import (
+    NoOfficialEvidenceProvider,
+    create_jd_pipeline_service,
+)
+from personal_shopping_agent.interfaces.mcp.schemas import (
+    AgentCapabilities,
+    RunShoppingPipelineInput,
+    StartShoppingWorkflowInput,
+)
+from personal_shopping_agent.presentation import (
+    RenderedShoppingReport,
+    RenderedShoppingReportPresentation,
+    ShoppingReportAccessService,
+    ShoppingReportResult,
+    ShoppingReportService,
+)
+from personal_shopping_agent.presentation.llm import (
+    ExplanationProviderKind,
+    LLMExplanationSettings,
+    create_report_presentation_service,
+    load_llm_explanation_settings,
+)
+from personal_shopping_agent.presentation.rendering import HtmlShoppingReportRenderer
+from personal_shopping_agent.sourcing import (
+    OfficialEvidenceProvider,
+    PageCollector,
+)
+from personal_shopping_agent.sourcing.browser import (
+    BrowserManager,
+    BrowserManagerSettings,
+    ControlledPageCollector,
+    NavigationPolicy,
+    StatusPageCollector,
+)
+from personal_shopping_agent.sourcing.platforms.jd import JD_ITEM_HOST, JD_SEARCH_HOST
 
 READ_ONLY = ToolAnnotations(
     read_only_hint=True,

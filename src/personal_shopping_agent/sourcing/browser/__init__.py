@@ -1,6 +1,6 @@
 """Controlled browser infrastructure for platform adapters."""
 
-from personal_shopping_agent.browser.access import (
+from personal_shopping_agent.sourcing.browser.access import (
     ControlledPageCollector,
     PageAccessRestrictedError,
     PageAccessSettings,
@@ -8,7 +8,7 @@ from personal_shopping_agent.browser.access import (
     StatusPage,
     StatusPageCollector,
 )
-from personal_shopping_agent.browser.manager import (
+from personal_shopping_agent.sourcing.browser.manager import (
     BrowserManager,
     BrowserManagerError,
     BrowserManagerSettings,
@@ -16,7 +16,7 @@ from personal_shopping_agent.browser.manager import (
     BrowserSnapshot,
     TransientBrowserManagerError,
 )
-from personal_shopping_agent.browser.policy import (
+from personal_shopping_agent.sourcing.browser.policy import (
     NavigationPolicy,
     NavigationPolicyError,
     ValidatedURL,

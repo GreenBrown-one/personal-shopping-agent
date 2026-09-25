@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from personal_shopping_agent.runtime_settings import LIVE_JD_ACCESS_ENV
+from personal_shopping_agent.infrastructure.settings import LIVE_JD_ACCESS_ENV
 
 
 class SourceCheckoutError(ValueError):

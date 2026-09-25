@@ -10,12 +10,12 @@ from alembic.script import ScriptDirectory
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 
-from personal_shopping_agent.local_security import (
+from personal_shopping_agent.infrastructure.local_security import (
     LocalFileSecurityError,
     inspect_private_file,
     prepare_private_file,
 )
-from personal_shopping_agent.storage.database import create_sqlite_engine
+from personal_shopping_agent.infrastructure.storage.database import create_sqlite_engine
 
 
 class DatabaseMigrationError(RuntimeError):
@@ -40,10 +40,11 @@ class DatabaseMigrationStatus:
 def migration_script_location() -> Path:
     """Resolve migrations from an installed wheel or the source checkout."""
 
-    package_location = Path(__file__).resolve().parents[1] / "migrations"
+    package_root = Path(__file__).resolve().parents[2]
+    package_location = package_root / "migrations"
     if package_location.is_dir():  # pragma: no cover - exercised by built-wheel smoke test
         return package_location
-    source_location = Path(__file__).resolve().parents[3] / "migrations"
+    source_location = package_root.parents[1] / "migrations"
     if not source_location.is_dir():  # pragma: no cover - defensive broken-package path
         raise DatabaseMigrationError("Packaged database migrations are unavailable.")
     return source_location

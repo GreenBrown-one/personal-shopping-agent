@@ -7,19 +7,6 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import HttpUrl, ValidationError
 
-from personal_shopping_agent.application import (
-    CandidateEvidenceConfidence,
-    CandidateScoringFoundation,
-    CandidateScoringFoundationBuilder,
-    CriterionEvidenceAssessment,
-    EvidenceCheck,
-    EvidenceCheckStatus,
-    EvidenceConfidenceEvaluator,
-    EvidenceScopeMismatchError,
-    InvalidEvidenceTimelineError,
-    NormalizedSpecification,
-    SpecificationNormalizationStatus,
-)
 from personal_shopping_agent.domain import (
     Budget,
     Evidence,
@@ -29,6 +16,21 @@ from personal_shopping_agent.domain import (
     Product,
     ShoppingCriterion,
     ShoppingRequest,
+)
+from personal_shopping_agent.presentation import (
+    CandidateEvidenceConfidence,
+    CandidateScoringFoundation,
+    CandidateScoringFoundationBuilder,
+    CriterionEvidenceAssessment,
+    EvidenceConfidenceEvaluator,
+    EvidenceScopeMismatchError,
+    InvalidEvidenceTimelineError,
+)
+from personal_shopping_agent.sourcing import (
+    EvidenceCheck,
+    EvidenceCheckStatus,
+    NormalizedSpecification,
+    SpecificationNormalizationStatus,
 )
 
 NOW = datetime(2026, 8, 9, 23, 0, tzinfo=UTC)
