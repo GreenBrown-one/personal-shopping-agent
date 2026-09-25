@@ -1,6 +1,7 @@
 """In-memory protocol tests for the official MCP Python SDK v2 adapter."""
 
 import asyncio
+import hashlib
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -46,6 +47,11 @@ from personal_shopping_agent.infrastructure.storage.scoring_unit_of_work import 
     candidate_score_record,
 )
 from personal_shopping_agent.intake import RequirementIssueCode, RequirementReview
+from personal_shopping_agent.interfaces.mcp.schemas import (
+    ReportExplanationView,
+    ReportRenderView,
+    ShoppingReportView,
+)
 from personal_shopping_agent.interfaces.mcp.server import (
     create_mcp_server,
     create_server_for_database,
@@ -60,11 +66,8 @@ from personal_shopping_agent.presentation import (
     CriterionEvidenceAssessment,
     ExplanationStatus,
     OfferCostAssessment,
-    RenderedShoppingReport,
-    RenderedShoppingReportPresentation,
     ReportFormat,
     ShoppingReportAccessService,
-    ShoppingReportResult,
     ShoppingReportService,
 )
 from personal_shopping_agent.presentation.llm import (
@@ -359,24 +362,31 @@ def test_mcp_report_tools_render_read_and_explicitly_fallback_without_llm() -> N
                 {"workflow_id": str(workflow_id)},
             )
             assert rendered_result.structured_content is not None
-            committed = ShoppingReportResult.model_validate(rendered_result.structured_content)
-            assert committed.snapshot.workflow.state is WorkflowState.REPORT_RENDERED
+            committed = ReportRenderView.model_validate(rendered_result.structured_content)
+            assert committed.workflow_state is WorkflowState.REPORT_RENDERED
+            assert committed.report.workflow_id == workflow_id
+            assert committed.report.candidates == 1
+            assert committed.report.eligible_candidates == 1
+            assert committed.report.format is ReportFormat.MARKDOWN
 
             stored_result = await client.call_tool(
                 "get_shopping_report",
                 {"workflow_id": str(workflow_id)},
             )
             assert stored_result.structured_content is not None
-            stored = RenderedShoppingReport.model_validate(stored_result.structured_content)
-            assert stored == committed.rendered
+            stored = ShoppingReportView.model_validate(stored_result.structured_content)
+            assert stored == committed.report
+            assert (
+                hashlib.sha256(stored.content.encode("utf-8")).hexdigest() == stored.content_sha256
+            )
 
             html_result = await client.call_tool(
                 "get_shopping_report_html",
                 {"workflow_id": str(workflow_id)},
             )
             assert html_result.structured_content is not None
-            html = RenderedShoppingReport.model_validate(html_result.structured_content)
-            assert html.report == stored.report
+            html = ShoppingReportView.model_validate(html_result.structured_content)
+            assert html.report_id == stored.report_id
             assert html.format is ReportFormat.HTML
             assert html.content.startswith("<!doctype html>")
             assert "Content-Security-Policy" in html.content
@@ -386,10 +396,9 @@ def test_mcp_report_tools_render_read_and_explicitly_fallback_without_llm() -> N
                 {"workflow_id": str(workflow_id)},
             )
             assert explained_result.structured_content is not None
-            presentation = RenderedShoppingReportPresentation.model_validate(
-                explained_result.structured_content
-            )
-            assert presentation.result.status is ExplanationStatus.DETERMINISTIC_FALLBACK
+            presentation = ReportExplanationView.model_validate(explained_result.structured_content)
+            assert presentation.status is ExplanationStatus.DETERMINISTIC_FALLBACK
+            assert presentation.provider_name is None
             assert presentation.content == stored.content
             assert presentation.content_sha256 == stored.content_sha256
 

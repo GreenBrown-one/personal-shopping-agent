@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from personal_shopping_agent.__about__ import __version__
 from personal_shopping_agent.automation import (
     ShoppingDecisionPipelineService,
-    ShoppingPipelineResult,
     ShoppingWorkflowService,
 )
 from personal_shopping_agent.domain import (
@@ -51,14 +50,15 @@ from personal_shopping_agent.interfaces.composition import (
 )
 from personal_shopping_agent.interfaces.mcp.schemas import (
     AgentCapabilities,
+    PipelineRunView,
+    ReportExplanationView,
+    ReportRenderView,
     RunShoppingPipelineInput,
+    ShoppingReportView,
     StartShoppingWorkflowInput,
 )
 from personal_shopping_agent.presentation import (
-    RenderedShoppingReport,
-    RenderedShoppingReportPresentation,
     ShoppingReportAccessService,
-    ShoppingReportResult,
     ShoppingReportService,
 )
 from personal_shopping_agent.presentation.llm import (
@@ -140,11 +140,12 @@ def create_mcp_server(
         description="Evidence-driven personal shopping workflow service.",
         instructions=(
             "Review a structured shopping request, then create and inspect local shopping "
-            "workflows. Requests with blocking issues are rejected. Deterministic reports can be "
-            "rendered "
-            "only after scoring has completed. Reading a report never calls an LLM; use the "
-            "separate explanation tool to explicitly request an optional model-generated overlay. "
-            "An end-to-end JD pipeline tool is present only in an explicitly configured server. "
+            "workflows; requests with blocking issues are rejected. Deterministic reports can be "
+            "rendered only after scoring has completed. Report and pipeline tools return compact "
+            "views whose content field is the complete user-facing report: show that text rather "
+            "than re-deriving facts. Reading a report never calls an LLM; use the separate "
+            "explanation tool to explicitly request an optional model-generated overlay. An "
+            "end-to-end JD pipeline tool is present only in an explicitly configured server. "
             "Checkout and payment are never available."
         ),
         lifespan=lifespan,
@@ -233,10 +234,14 @@ def create_mcp_server(
         annotations=LOCAL_WRITE,
         structured_output=True,
     )
-    def _render_shopping_report(workflow_id: UUID) -> ShoppingReportResult:
+    def _render_shopping_report(workflow_id: UUID) -> ReportRenderView:
         """Persist a deterministic report and its workflow event for a scored workflow."""
 
-        return report_service.render(workflow_id)
+        result = report_service.render(workflow_id)
+        return ReportRenderView(
+            workflow_state=result.snapshot.workflow.state,
+            report=ShoppingReportView.from_rendered(result.rendered),
+        )
 
     @server.tool(
         name="get_shopping_report",
@@ -244,10 +249,10 @@ def create_mcp_server(
         annotations=READ_ONLY,
         structured_output=True,
     )
-    def _get_shopping_report(workflow_id: UUID) -> RenderedShoppingReport:
-        """Read the stored report without invoking an LLM or changing local state."""
+    def _get_shopping_report(workflow_id: UUID) -> ShoppingReportView:
+        """Read the stored Markdown report without invoking an LLM or changing local state."""
 
-        return report_access_service.get(workflow_id)
+        return ShoppingReportView.from_rendered(report_access_service.get(workflow_id))
 
     @server.tool(
         name="get_shopping_report_html",
@@ -255,10 +260,10 @@ def create_mcp_server(
         annotations=READ_ONLY,
         structured_output=True,
     )
-    def _get_shopping_report_html(workflow_id: UUID) -> RenderedShoppingReport:
+    def _get_shopping_report_html(workflow_id: UUID) -> ShoppingReportView:
         """Derive script-free HTML from the validated deterministic report snapshot."""
 
-        return report_access_service.get_html(workflow_id)
+        return ShoppingReportView.from_rendered(report_access_service.get_html(workflow_id))
 
     @server.tool(
         name="explain_shopping_report",
@@ -266,10 +271,10 @@ def create_mcp_server(
         annotations=EXTERNAL_READ,
         structured_output=True,
     )
-    def _explain_shopping_report(workflow_id: UUID) -> RenderedShoppingReportPresentation:
+    def _explain_shopping_report(workflow_id: UUID) -> ReportExplanationView:
         """Return an ephemeral overlay or the byte-identical deterministic fallback."""
 
-        return report_access_service.explain(workflow_id)
+        return ReportExplanationView.from_presentation(report_access_service.explain(workflow_id))
 
     if pipeline_service is not None:
         configured_pipeline = pipeline_service
@@ -282,13 +287,14 @@ def create_mcp_server(
         )
         async def _run_shopping_pipeline(
             request: RunShoppingPipelineInput,
-        ) -> ShoppingPipelineResult:
-            """Execute only real remaining stages and stop at the last committed stage on error."""
+        ) -> PipelineRunView:
+            """Execute only real remaining stages and return the final report text."""
 
-            return await configured_pipeline.run(
+            result = await configured_pipeline.run(
                 request.workflow_id,
                 options=request.to_options(),
             )
+            return PipelineRunView.from_result(result)
 
         _ = _run_shopping_pipeline
 

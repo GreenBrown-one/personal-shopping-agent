@@ -102,7 +102,13 @@ stdio MCP 会等待宿主通信，因此终端没有普通交互提示是正常�
 }
 ```
 
-Windows 可以使用正斜杠路径，例如 `C:/Users/name/personal-shopping-agent`。必须改成实际绝对路径。浏览器型 AI 宿主如果不能启动本地进程，则需要额外的受控远程 MCP 网关；本仓库目前不提供该网关。
+Windows 可以使用正斜杠路径，例如 `C:/Users/name/personal-shopping-agent`。必须改成实际绝对路径。
+
+**推荐宿主：Claude Desktop（Windows / macOS）。** 打开 设置 → 开发者 → 编辑配置，把 `mcp-config` 输出中
+`config` 里的 `mcpServers` 块合并进 `claude_desktop_config.json`（Windows 位于
+`%APPDATA%\Claude\`），保存后完全退出并重新打开 Claude Desktop。若提示找不到 `uv`，安装 uv 后重启电脑
+让 PATH 生效。购物对话建议在 Claude Desktop 中进行；修改本项目代码请在单独的开发会话（如 Claude Code）
+中进行，避免网页内容与代码修改权限出现在同一个会话里（见 `DESIGN.md` 3.1）。浏览器型 AI 宿主如果不能启动本地进程，则需要额外的受控远程 MCP 网关；本仓库目前不提供该网关。
 
 连接后先让 AI 调用 `shopping_agent_status`。默认结果应明确显示：需求审查、本地工作流和报告可用，而 `platform_collection` 与 `end_to_end_pipeline` 为 `false`。
 

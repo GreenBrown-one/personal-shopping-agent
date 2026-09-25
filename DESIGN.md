@@ -469,6 +469,19 @@ HTML 适配器使用 Jinja2 3.1 系列的包内模板、`SandboxedEnvironment`�
 数据库。可选模型解释继续通过独立的 Markdown 解释工具提供，不混入确定性 HTML，以保持 HTML 导出
 完全可复现。模板必须随 Python wheel 打包并在发布验证中检查。
 
+#### 5.5.1 MCP 紧凑输出（M9）
+
+MCP 工具的结构化输出会作为工具定义（输出 Schema）和每次调用结果进入宿主模型上下文。完整报告快照
+（每个候选的 Product、Offer、Evidence 与全部评分输入）的输出 Schema 每个约 25 KB，单候选结果约 25 KB，
+而同一事实的已转义 Markdown 报告只有约 2 KB。因此 M9 起：
+
+- 报告相关工具与端到端管线只返回紧凑视图：工作流 ID、报告 ID、格式、候选数、合格候选数、确定性推荐
+  Product ID、内容 SHA-256、生成时间和报告正文（Markdown 或 HTML）；解释工具另返回状态、回退原因、
+  提供方与模型名；
+- 视图只能从服务端已完整校验的 `RenderedShoppingReport` / `RenderedShoppingReportPresentation` 构造，
+  正文与哈希逐字节保持不变；完整 JSON 快照继续保存在本地数据库，并可用 CLI `data export` 导出复核；
+- `run_shopping_pipeline` 直接返回报告正文，宿主无需再调用一次 `get_shopping_report`。
+
 ### 5.6 M6 可恢复端到端装配
 
 M6 第一个切片新增应用层 `ShoppingDecisionPipelineService`，但不绕过任何既有用例或事务。它先读取

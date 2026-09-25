@@ -1,18 +1,25 @@
-"""MCP-specific input and capability models kept outside the core domain."""
+"""MCP-specific inputs, capability status, and compact outputs kept outside the core layers."""
 
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from personal_shopping_agent.automation import (
-    ShoppingPipelineOptions,
-)
+from personal_shopping_agent.automation import ShoppingPipelineOptions, ShoppingPipelineResult
 from personal_shopping_agent.domain import (
     Budget,
+    JsonContractModel,
     Money,
     ShoppingCriterion,
     ShoppingRequest,
+    WorkflowState,
+)
+from personal_shopping_agent.presentation import (
+    ExplanationFallbackReason,
+    ExplanationStatus,
+    RenderedShoppingReport,
+    RenderedShoppingReportPresentation,
+    ReportFormat,
 )
 
 
@@ -111,3 +118,100 @@ class AgentCapabilities(MCPModel):
     llm_explanation_provider: str
     automatic_purchase: bool
     message: str
+
+
+class MCPViewModel(JsonContractModel):
+    """Compact tool output; unlike inputs, text is never stripped so hashes stay exact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class ShoppingReportView(MCPViewModel):
+    """The deterministic report text and its identity, without the full JSON snapshot."""
+
+    workflow_id: UUID
+    report_id: UUID
+    format: ReportFormat
+    candidates: int = Field(ge=1)
+    eligible_candidates: int = Field(ge=0)
+    recommended_product_id: UUID | None
+    content_sha256: str
+    rendered_at: AwareDatetime
+    content: str
+
+    @classmethod
+    def from_rendered(cls, rendered: RenderedShoppingReport) -> "ShoppingReportView":
+        """Project an already integrity-checked report without altering its bytes."""
+
+        report = rendered.report
+        return cls(
+            workflow_id=report.workflow_id,
+            report_id=report.id,
+            format=rendered.format,
+            candidates=len(report.candidates),
+            eligible_candidates=sum(1 for item in report.candidates if item.score.eligible),
+            recommended_product_id=report.recommended_product_id,
+            content_sha256=rendered.content_sha256,
+            rendered_at=rendered.rendered_at,
+            content=rendered.content,
+        )
+
+
+class ReportRenderView(MCPViewModel):
+    """Workflow state after rendering, plus the compact report."""
+
+    workflow_state: WorkflowState
+    report: ShoppingReportView
+
+
+class ReportExplanationView(MCPViewModel):
+    """Explanation outcome and the presented text (the deterministic report on fallback)."""
+
+    workflow_id: UUID
+    report_id: UUID
+    status: ExplanationStatus
+    fallback_reason: ExplanationFallbackReason | None
+    provider_name: str | None
+    model_name: str | None
+    content_sha256: str
+    content: str
+
+    @classmethod
+    def from_presentation(
+        cls, presentation: RenderedShoppingReportPresentation
+    ) -> "ReportExplanationView":
+        """Project an already validated presentation without altering its bytes."""
+
+        result = presentation.result
+        return cls(
+            workflow_id=result.rendered.report.workflow_id,
+            report_id=result.rendered.report.id,
+            status=result.status,
+            fallback_reason=result.fallback_reason,
+            provider_name=result.provider_name,
+            model_name=result.model_name,
+            content_sha256=presentation.content_sha256,
+            content=presentation.content,
+        )
+
+
+class PipelineRunView(MCPViewModel):
+    """Stages this call executed and the final report, ready to show the user."""
+
+    workflow_id: UUID
+    started_from: WorkflowState
+    executed_stages: tuple[WorkflowState, ...]
+    workflow_state: WorkflowState
+    report: ShoppingReportView
+
+    @classmethod
+    def from_result(cls, result: ShoppingPipelineResult) -> "PipelineRunView":
+        """Summarize a validated pipeline result."""
+
+        return cls(
+            workflow_id=result.snapshot.workflow.id,
+            started_from=result.started_from,
+            executed_stages=result.executed_stages,
+            workflow_state=result.snapshot.workflow.state,
+            report=ShoppingReportView.from_rendered(result.rendered),
+        )

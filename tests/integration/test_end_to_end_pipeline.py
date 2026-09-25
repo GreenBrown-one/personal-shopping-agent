@@ -29,6 +29,7 @@ from personal_shopping_agent.domain import (
     WorkflowState,
 )
 from personal_shopping_agent.infrastructure.storage import (
+    SQLiteShoppingReportRepository,
     SQLiteWorkflowRepository,
     create_schema,
     create_session_factory,
@@ -36,9 +37,7 @@ from personal_shopping_agent.infrastructure.storage import (
 )
 from personal_shopping_agent.interfaces.composition import NoOfficialEvidenceProvider
 from personal_shopping_agent.interfaces.mcp import create_jd_pipeline_server_for_database
-from personal_shopping_agent.presentation import (
-    RenderedShoppingReport,
-)
+from personal_shopping_agent.interfaces.mcp.schemas import PipelineRunView, ShoppingReportView
 from personal_shopping_agent.sourcing import (
     ChipBenchmarkEntry,
     ChipBenchmarkEvidenceProvider,
@@ -150,22 +149,35 @@ def test_explicit_jd_pipeline_runs_resumes_and_keeps_mcp_boundaries(tmp_path: Pa
                 },
             )
             assert run_call.structured_content is not None
-            result = ShoppingPipelineResult.model_validate(run_call.structured_content)
-            assert result.started_from is WorkflowState.REQUEST_VALIDATED
-            assert result.executed_stages == PIPELINE_STATE_SEQUENCE[1:]
-            assert result.snapshot.workflow.state is WorkflowState.COMPLETED
-            assert result.rendered.report.recommended_product_id is not None
-            assert len(result.rendered.report.candidates) == 1
+            view = PipelineRunView.model_validate(run_call.structured_content)
+            assert view.started_from is WorkflowState.REQUEST_VALIDATED
+            assert view.executed_stages == PIPELINE_STATE_SEQUENCE[1:]
+            assert view.workflow_state is WorkflowState.COMPLETED
+            assert view.report.recommended_product_id is not None
+            assert view.report.candidates == 1
+            assert view.report.content.startswith("# 购物比较报告")
             assert len(collector.calls) == 2
+
+            reader_engine = create_sqlite_engine(database_url)
+            reader_factory = create_session_factory(reader_engine)
+            stored = SQLiteShoppingReportRepository(reader_factory).get(started.workflow.id)
+            result = ShoppingPipelineResult(
+                started_from=view.started_from,
+                executed_stages=view.executed_stages,
+                snapshot=ShoppingWorkflowService(SQLiteWorkflowRepository(reader_factory)).get(
+                    started.workflow.id
+                ),
+                rendered=stored,
+            )
+            reader_engine.dispose()
+            assert view.report == ShoppingReportView.from_rendered(stored)
 
             stored_call = await client.call_tool(
                 "get_shopping_report",
                 {"workflow_id": str(started.workflow.id)},
             )
             assert stored_call.structured_content is not None
-            assert RenderedShoppingReport.model_validate(stored_call.structured_content) == (
-                result.rendered
-            )
+            assert ShoppingReportView.model_validate(stored_call.structured_content) == view.report
 
             resumed_call = await client.call_tool(
                 "run_shopping_pipeline",
@@ -178,10 +190,10 @@ def test_explicit_jd_pipeline_runs_resumes_and_keeps_mcp_boundaries(tmp_path: Pa
                 },
             )
             assert resumed_call.structured_content is not None
-            resumed = ShoppingPipelineResult.model_validate(resumed_call.structured_content)
+            resumed = PipelineRunView.model_validate(resumed_call.structured_content)
             assert resumed.started_from is WorkflowState.COMPLETED
             assert resumed.executed_stages == ()
-            assert resumed.rendered == result.rendered
+            assert resumed.report == view.report
             assert len(collector.calls) == 2
 
             invalid_snapshot = result.snapshot.model_copy(
@@ -387,7 +399,7 @@ def test_chip_benchmark_evidence_flows_into_normalization_ranking_and_report(
         independent_providers=(ChipBenchmarkEvidenceProvider(reference),),
     )
 
-    async def scenario() -> ShoppingPipelineResult:
+    async def scenario() -> PipelineRunView:
         async with Client(server, raise_exceptions=True) as client:
             status = await client.call_tool("shopping_agent_status", {})
             assert status.structured_content is not None
@@ -430,10 +442,15 @@ def test_chip_benchmark_evidence_flows_into_normalization_ranking_and_report(
                 },
             )
             assert run_call.structured_content is not None
-            return ShoppingPipelineResult.model_validate(run_call.structured_content)
+            return PipelineRunView.model_validate(run_call.structured_content)
 
-    result = asyncio.run(scenario())
-    candidate = result.rendered.report.candidates[0]
+    view = asyncio.run(scenario())
+    reader_engine = create_sqlite_engine(database_url)
+    stored = SQLiteShoppingReportRepository(create_session_factory(reader_engine)).get(
+        view.workflow_id
+    )
+    reader_engine.dispose()
+    candidate = stored.report.candidates[0]
     chip = next(
         item
         for item in candidate.score.foundation.criterion_evaluations
@@ -448,4 +465,4 @@ def test_chip_benchmark_evidence_flows_into_normalization_ranking_and_report(
         and item.source_type.value == "independent_review"
         for item in candidate.evidence
     )
-    assert "| chip\\_performance |" in result.rendered.content
+    assert "| chip\\_performance |" in view.report.content
