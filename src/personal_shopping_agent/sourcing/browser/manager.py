@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -64,11 +65,14 @@ class BrowserManagerSettings:
     screenshot_directory: Path = Path("screenshots")
     headless: bool = True
     navigation_timeout_ms: int = 20_000
+    settle_timeout_ms: int = 5_000
     maximum_html_bytes: int = 2_000_000
 
     def __post_init__(self) -> None:
         if self.navigation_timeout_ms < 1:
             raise ValueError("navigation_timeout_ms must be positive")
+        if not 0 <= self.settle_timeout_ms <= 30_000:
+            raise ValueError("settle_timeout_ms must be between 0 and 30000")
         if self.maximum_html_bytes < 1:
             raise ValueError("maximum_html_bytes must be positive")
 
@@ -103,6 +107,12 @@ class BrowserManager:
         self._page: Page | None = None
         self._last_violation: NavigationPolicyError | None = None
         self._navigation_lock = asyncio.Lock()
+
+    @property
+    def settings(self) -> BrowserManagerSettings:
+        """Return the immutable local browser settings for diagnostics and tests."""
+
+        return self._settings
 
     async def __aenter__(self) -> BrowserManager:
         await self.start()
@@ -186,6 +196,12 @@ class BrowserManager:
                     "The destination page could not be opened."
                 ) from error
 
+            if self._settings.settle_timeout_ms:
+                # A page that keeps polling is still readable after the bounded wait.
+                with suppress(PlaywrightError):
+                    await page.wait_for_load_state(
+                        "networkidle", timeout=self._settings.settle_timeout_ms
+                    )
             await self._policy.validate(page.url)
             html = await page.content()
             if len(html.encode("utf-8")) > self._settings.maximum_html_bytes:
@@ -229,10 +245,24 @@ class BrowserManager:
             )
 
     async def _guard_route(self, route: Route, request: Request) -> None:
+        main_frame = _is_main_frame_navigation(request)
         try:
-            await self._policy.validate(request.url)
+            if main_frame:
+                await self._policy.validate(request.url)
+            else:
+                await self._policy.validate_subresource(request.url)
         except NavigationPolicyError as violation:
-            self._last_violation = violation
+            if main_frame:
+                self._last_violation = violation
             await route.abort("blockedbyclient")
         else:
             await route.continue_()
+
+
+def _is_main_frame_navigation(request: Request) -> bool:
+    """Only top-level document loads use the exact page allowlist."""
+
+    try:
+        return request.is_navigation_request() and request.frame.parent_frame is None
+    except PlaywrightError:
+        return False  # Service-worker requests have no frame; treat them as resources.

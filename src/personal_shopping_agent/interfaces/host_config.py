@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from personal_shopping_agent.infrastructure.settings import LIVE_JD_ACCESS_ENV
+from personal_shopping_agent.infrastructure.settings import LIVE_JD_ACCESS_ENV, LIVE_JD_HEADLESS_ENV
 
 
 class SourceCheckoutError(ValueError):
@@ -31,6 +31,8 @@ def build_source_mcp_configuration(
     environment = {"PERSONAL_SHOPPING_LLM_PROVIDER": "disabled"}
     if live_jd:
         environment[LIVE_JD_ACCESS_ENV] = "true"
+        # A visible window lets the user watch every page and step in at any verification prompt.
+        environment[LIVE_JD_HEADLESS_ENV] = "false"
     return {
         "mcpServers": {
             "personal-shopping-agent": {

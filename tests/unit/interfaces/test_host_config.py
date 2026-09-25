@@ -5,7 +5,11 @@ from typing import cast
 
 import pytest
 
-from personal_shopping_agent.infrastructure.settings import LIVE_JD_ACCESS_ENV
+from personal_shopping_agent.infrastructure.settings import LIVE_JD_ACCESS_ENV, LIVE_JD_HEADLESS_ENV
+from personal_shopping_agent.interfaces.composition import (
+    create_jd_collection_policy,
+    create_jd_sign_in_policy,
+)
 from personal_shopping_agent.interfaces.host_config import (
     SourceCheckoutError,
     build_source_mcp_configuration,
@@ -51,6 +55,7 @@ def test_live_source_configuration_selects_only_the_explicit_entrypoint(tmp_path
     assert cast(dict[str, str], details["env"]) == {
         "PERSONAL_SHOPPING_LLM_PROVIDER": "disabled",
         LIVE_JD_ACCESS_ENV: "true",
+        LIVE_JD_HEADLESS_ENV: "false",
     }
 
 
@@ -65,3 +70,16 @@ def test_source_configuration_rejects_missing_and_incomplete_checkouts(tmp_path:
     (tmp_path / "uv.lock").write_text("version = 1\n")
     with pytest.raises(SourceCheckoutError, match="complete source checkout"):
         build_source_mcp_configuration(tmp_path)
+
+
+def test_jd_policies_separate_collection_pages_from_the_sign_in_flow() -> None:
+    collection = create_jd_collection_policy()
+    sign_in = create_jd_sign_in_policy()
+
+    assert collection.allowed_hosts == {"search.jd.com", "item.jd.com"}
+    assert sign_in.allowed_hosts == {
+        "passport.jd.com",
+        "www.jd.com",
+        "search.jd.com",
+        "item.jd.com",
+    }

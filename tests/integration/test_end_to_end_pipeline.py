@@ -37,7 +37,7 @@ from personal_shopping_agent.interfaces.mcp import create_jd_pipeline_server_for
 from personal_shopping_agent.presentation import (
     RenderedShoppingReport,
 )
-from personal_shopping_agent.sourcing.browser import BrowserSnapshot
+from personal_shopping_agent.sourcing.browser import BrowserSnapshot, NavigationPolicyError
 
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "jd"
 
@@ -280,6 +280,61 @@ def test_pipeline_stops_before_platform_access_when_stored_request_is_unclear(
     asyncio.run(scenario())
     assert collector.calls == []
     assert workflow_service.get(unclear.workflow.id).workflow.state is (
+        WorkflowState.REQUEST_VALIDATED
+    )
+    engine.dispose()
+
+
+class SignInWallCollector(FixtureJDPageCollector):
+    """Simulate JD redirecting an unauthenticated search to its sign-in host."""
+
+    async def open(self, url: str, *, screenshot: bool = False) -> BrowserSnapshot:
+        self.calls.append(url)
+        raise NavigationPolicyError(
+            "sign_in_required",
+            "The platform requires a manual sign-in. Run `personal-shopping-agent login` "
+            "for this platform on this computer, then retry.",
+        )
+
+
+def test_sign_in_wall_stops_with_login_instructions_and_stays_resumable(
+    tmp_path: Path,
+) -> None:
+    database_url = f"sqlite:///{tmp_path / 'sign-in.db'}"
+    engine = create_sqlite_engine(database_url)
+    create_schema(engine)
+    workflow_service = ShoppingWorkflowService(
+        SQLiteWorkflowRepository(create_session_factory(engine))
+    )
+    started = workflow_service.start(
+        ShoppingRequest(
+            query="大电池手机",
+            category="smartphone",
+            region="云南省曲靖市",
+            budget=Budget(maximum=Money(amount=Decimal("3000"))),
+            criteria=(
+                ShoppingCriterion(key="battery_capacity", minimum=Decimal("5000"), unit="mAh"),
+            ),
+        )
+    )
+    collector = SignInWallCollector()
+    server = create_jd_pipeline_server_for_database(
+        database_url, collector, NoOfficialEvidenceProvider(), environment={}
+    )
+
+    async def scenario() -> None:
+        async with Client(server, raise_exceptions=True) as client:
+            result = await client.call_tool(
+                "run_shopping_pipeline",
+                {"request": {"workflow_id": str(started.workflow.id)}},
+            )
+            assert result.is_error is True
+            assert isinstance(result.content[0], TextContent)
+            assert "personal-shopping-agent login" in result.content[0].text
+
+    asyncio.run(scenario())
+    assert len(collector.calls) == 1
+    assert workflow_service.get(started.workflow.id).workflow.state is (
         WorkflowState.REQUEST_VALIDATED
     )
     engine.dispose()

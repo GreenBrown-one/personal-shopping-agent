@@ -1,10 +1,12 @@
 """Safe local administration CLI: health, migrations, data lifecycle, and improvement cases."""
 
 import argparse
+import asyncio
 import json
-from collections.abc import Mapping, Sequence
+import sys
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import cast
+from typing import Protocol, cast
 from uuid import UUID
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -34,11 +36,48 @@ from personal_shopping_agent.infrastructure.storage import (
     require_current_database,
     upgrade_database,
 )
+from personal_shopping_agent.interfaces.composition import create_jd_sign_in_policy
 from personal_shopping_agent.interfaces.health import health_check
 from personal_shopping_agent.interfaces.host_config import (
     SourceCheckoutError,
     build_source_mcp_configuration,
 )
+from personal_shopping_agent.sourcing.browser import (
+    BrowserManager,
+    BrowserManagerError,
+    BrowserManagerSettings,
+    NavigationPolicyError,
+)
+from personal_shopping_agent.sourcing.platforms.jd import JD_SIGN_IN_URL
+
+SIGN_IN_INSTRUCTIONS = (
+    "A visible browser window opened with the dedicated local profile. Sign in to JD yourself "
+    "(complete any verification yourself as well), then return here and press Enter to close "
+    "the browser. This program never reads or stores your password.\n"
+)
+
+
+class SignInBrowser(Protocol):
+    """The browser lifecycle subset a manual sign-in session needs."""
+
+    async def start(self) -> None: ...
+
+    async def open(self, url: str, *, screenshot: bool = False) -> object: ...
+
+    async def close(self) -> None: ...
+
+
+def create_sign_in_browser() -> SignInBrowser:
+    return BrowserManager(
+        create_jd_sign_in_policy(),
+        settings=BrowserManagerSettings(headless=False),
+    )
+
+
+def wait_for_enter() -> None:
+    sys.stderr.write(SIGN_IN_INSTRUCTIONS)
+    sys.stderr.flush()
+    sys.stdin.readline()
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -85,6 +124,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     delete_parser.add_argument("workflow_id")
     delete_parser.add_argument("--confirm")
+    login_parser = commands.add_parser(
+        "login",
+        help="sign in yourself in a visible browser using the dedicated local profile",
+    )
+    login_parser.add_argument("platform", choices=("jd",))
     improvement_parser = commands.add_parser(
         "improvement-case",
         help="print a local sanitized improvement case preview; nothing is uploaded",
@@ -364,10 +408,61 @@ def _run_improvement_case(
     return 0
 
 
+async def _sign_in_session(browser: SignInBrowser, wait_for_user: Callable[[], None]) -> str:
+    try:
+        await browser.start()
+    except BrowserManagerError:
+        return "browser_unavailable"
+    try:
+        await browser.open(JD_SIGN_IN_URL)
+        await asyncio.to_thread(wait_for_user)
+    except (BrowserManagerError, NavigationPolicyError):
+        return "sign_in_page_unavailable"
+    finally:
+        await browser.close()
+    return ""
+
+
+def _run_login(
+    namespace: argparse.Namespace,
+    *,
+    browser_factory: Callable[[], SignInBrowser],
+    wait_for_user: Callable[[], None],
+) -> int:
+    platform = cast(str, namespace.platform)
+    error_code = asyncio.run(_sign_in_session(browser_factory(), wait_for_user))
+    if error_code == "browser_unavailable":
+        _emit_data_error(
+            error_code,
+            "Chromium could not start. Run `uv run --locked playwright install chromium` and "
+            "make sure data/browser-profiles is private to your account.",
+            command="login",
+        )
+        return 2
+    if error_code:
+        _emit_data_error(
+            error_code,
+            "The sign-in page could not be opened safely; the browser was closed.",
+            command="login",
+        )
+        return 2
+    _emit(
+        {
+            "command": "login",
+            "message": "Browser closed. The sign-in state stays only in the private local profile.",
+            "ok": True,
+            "platform": platform,
+        }
+    )
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
     environment: Mapping[str, str] | None = None,
+    sign_in_browser_factory: Callable[[], SignInBrowser] = create_sign_in_browser,
+    wait_for_user: Callable[[], None] = wait_for_enter,
 ) -> int:
     """Execute one non-interactive command and return a process exit code."""
 
@@ -392,6 +487,13 @@ def main(
 
     if command_name == "improvement-case":
         return _run_improvement_case(namespace, environment=environment)
+
+    if command_name == "login":
+        return _run_login(
+            namespace,
+            browser_factory=sign_in_browser_factory,
+            wait_for_user=wait_for_user,
+        )
 
     explicit_database_url = cast(str | None, namespace.database_url)
     database_url = explicit_database_url or database_url_from_environment(environment)

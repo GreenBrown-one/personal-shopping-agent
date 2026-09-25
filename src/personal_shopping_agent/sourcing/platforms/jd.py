@@ -17,6 +17,11 @@ from personal_shopping_agent.sourcing.discovery import (
 JD_PLATFORM = "jd"
 JD_SEARCH_HOST = "search.jd.com"
 JD_ITEM_HOST = "item.jd.com"
+JD_SIGN_IN_HOST = "passport.jd.com"
+JD_SIGN_IN_URL = f"https://{JD_SIGN_IN_HOST}/new/login.aspx"
+JD_HOME_HOST = "www.jd.com"
+# Registrable domains JD pages load their own scripts, styles, images, and price data from.
+JD_SUBRESOURCE_DOMAINS = ("jd.com", "360buyimg.com", "3.cn")
 _SKU_PATTERN = re.compile(r"\d{1,32}")
 _PRICE_PATTERN = re.compile(r"\d[\d,]*(?:\.\d{1,2})?")
 _RESTRICTION_MARKERS = (

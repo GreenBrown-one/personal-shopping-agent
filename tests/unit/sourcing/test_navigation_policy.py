@@ -128,3 +128,44 @@ def test_policy_propagates_sanitized_resolver_failure() -> None:
 
     policy = NavigationPolicy({"shop.example"}, resolver=resolver)
     assert_policy_error(policy, "https://shop.example/products", "dns_resolution_failed")
+
+
+def test_subresources_may_use_declared_platform_domains_but_pages_may_not() -> None:
+    policy = NavigationPolicy(
+        {"search.jd.com"},
+        subresource_domains=("jd.com", "360buyimg.com"),
+        resolver=public_resolver,
+    )
+
+    for url in (
+        "https://search.jd.com/s.js",
+        "https://api.m.jd.com/price",
+        "https://jd.com/favicon.ico",
+        "https://img10.360buyimg.com/item.jpg",
+    ):
+        assert run(policy.validate_subresource(url)).url == url
+    assert_policy_error(policy, "https://api.m.jd.com/price", "host_not_allowed")
+    for look_alike in ("https://evil-jd.com/x.js", "https://jd.com.evil.example/x.js"):
+        with pytest.raises(NavigationPolicyError) as captured:
+            run(policy.validate_subresource(look_alike))
+        assert captured.value.code == "host_not_allowed"
+    with pytest.raises(NavigationPolicyError) as unsafe:
+        run(policy.validate_subresource("http://img10.360buyimg.com/item.jpg"))
+    assert unsafe.value.code == "scheme_not_allowed"
+    with pytest.raises(NavigationPolicyError) as trade:
+        run(policy.validate_subresource("https://api.m.jd.com/order/submit"))
+    assert trade.value.code == "transaction_path_blocked"
+
+
+def test_sign_in_redirects_are_reported_as_sign_in_required() -> None:
+    policy = NavigationPolicy(
+        {"search.jd.com"}, sign_in_hosts=("passport.jd.com",), resolver=public_resolver
+    )
+
+    assert_policy_error(policy, "https://passport.jd.com/new/login.aspx", "sign_in_required")
+
+
+@pytest.mark.parametrize("domains", [("",), ("localhost",)])
+def test_subresource_domains_must_be_registrable_names(domains: tuple[str, ...]) -> None:
+    with pytest.raises(ValueError, match="registrable"):
+        NavigationPolicy({"search.jd.com"}, subresource_domains=domains)

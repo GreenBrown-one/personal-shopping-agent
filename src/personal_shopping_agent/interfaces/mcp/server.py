@@ -40,6 +40,7 @@ from personal_shopping_agent.intake import (
 )
 from personal_shopping_agent.interfaces.composition import (
     NoOfficialEvidenceProvider,
+    create_jd_collection_policy,
     create_jd_pipeline_service,
 )
 from personal_shopping_agent.interfaces.mcp.schemas import (
@@ -69,10 +70,8 @@ from personal_shopping_agent.sourcing.browser import (
     BrowserManager,
     BrowserManagerSettings,
     ControlledPageCollector,
-    NavigationPolicy,
     StatusPageCollector,
 )
-from personal_shopping_agent.sourcing.platforms.jd import JD_ITEM_HOST, JD_SEARCH_HOST
 
 READ_ONLY = ToolAnnotations(
     read_only_hint=True,
@@ -386,7 +385,7 @@ def create_live_jd_server_for_database(
     collector = managed_collector
     if collector is None:
         collector = BrowserManager(
-            NavigationPolicy((JD_SEARCH_HOST, JD_ITEM_HOST)),
+            create_jd_collection_policy(),
             settings=BrowserManagerSettings(headless=settings.headless),
         )
     bounded_collector = ControlledPageCollector(collector)

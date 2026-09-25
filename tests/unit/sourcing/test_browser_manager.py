@@ -18,6 +18,7 @@ from personal_shopping_agent.sourcing.browser import (
     BrowserNotStartedError,
     NavigationPolicy,
     NavigationPolicyError,
+    TransientBrowserManagerError,
 )
 from personal_shopping_agent.sourcing.browser.manager import PlaywrightFactory
 
@@ -37,9 +38,33 @@ class FakeResponse:
         self.status = status
 
 
+class FakeFrame:
+    def __init__(self, parent_frame: "FakeFrame | None" = None) -> None:
+        self.parent_frame = parent_frame
+
+
 class FakeRequest:
-    def __init__(self, url: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        *,
+        navigation: bool = True,
+        frame: FakeFrame | None = None,
+        frame_error: bool = False,
+    ) -> None:
         self.url = url
+        self._navigation = navigation
+        self._frame = frame or FakeFrame()
+        self._frame_error = frame_error
+
+    def is_navigation_request(self) -> bool:
+        return self._navigation
+
+    @property
+    def frame(self) -> FakeFrame:
+        if self._frame_error:
+            raise PlaywrightError("service worker request has no frame")
+        return self._frame
 
 
 class FakeRoute:
@@ -64,6 +89,8 @@ class FakePage:
         self.screenshot_error: PlaywrightError | None = None
         self.goto_hook: Callable[[], Awaitable[None]] | None = None
         self.goto_calls: list[tuple[str, str, int]] = []
+        self.settle_calls: list[tuple[str, int]] = []
+        self.settle_error: PlaywrightError | None = None
         self.screenshot_calls: list[tuple[str, bool]] = []
 
     async def goto(self, url: str, *, wait_until: str, timeout: int) -> FakeResponse | None:
@@ -73,6 +100,11 @@ class FakePage:
         if self.goto_error is not None:
             raise self.goto_error
         return self.response
+
+    async def wait_for_load_state(self, state: str, *, timeout: int) -> None:
+        self.settle_calls.append((state, timeout))
+        if self.settle_error is not None:
+            raise self.settle_error
 
     async def content(self) -> str:
         return self.html
@@ -151,6 +183,7 @@ def make_manager(
     *,
     has_existing_page: bool = True,
     maximum_html_bytes: int = 2_000_000,
+    settle_timeout_ms: int = 500,
 ) -> tuple[BrowserManager, FakePage, FakeContext, FakeChromium, FakePlaywright]:
     page = FakePage()
     context = FakeContext(page, has_existing_page=has_existing_page)
@@ -163,9 +196,15 @@ def make_manager(
         screenshot_directory=tmp_path / "screenshots",
         headless=False,
         navigation_timeout_ms=1_234,
+        settle_timeout_ms=settle_timeout_ms,
         maximum_html_bytes=maximum_html_bytes,
     )
-    policy = NavigationPolicy({"shop.example"}, resolver=public_resolver)
+    policy = NavigationPolicy(
+        {"shop.example"},
+        subresource_domains=("static-shop.example",),
+        sign_in_hosts=("login.shop.example",),
+        resolver=public_resolver,
+    )
     manager = BrowserManager(
         policy,
         settings=settings,
@@ -190,6 +229,9 @@ def test_settings_accept_positive_limits(settings: BrowserManagerSettings) -> No
 def test_settings_reject_nonpositive_limits() -> None:
     with pytest.raises(ValueError, match="navigation_timeout_ms"):
         BrowserManagerSettings(navigation_timeout_ms=0)
+    for settle in (-1, 30_001):
+        with pytest.raises(ValueError, match="settle_timeout_ms"):
+            BrowserManagerSettings(settle_timeout_ms=settle)
     with pytest.raises(ValueError, match="maximum_html_bytes"):
         BrowserManagerSettings(maximum_html_bytes=0)
 
@@ -440,6 +482,108 @@ def test_open_revalidates_final_redirect_url(tmp_path: Path) -> None:
         with pytest.raises(NavigationPolicyError) as captured:
             await manager.open("https://shop.example/products")
         assert captured.value.code == "host_not_allowed"
+        await manager.close()
+
+    run(scenario())
+
+
+def test_open_waits_a_bounded_settle_window_and_tolerates_its_timeout(tmp_path: Path) -> None:
+    manager, page, _context, _chromium, _playwright = make_manager(tmp_path)
+    page.settle_error = PlaywrightError("Timeout 500ms exceeded")
+
+    async def scenario() -> None:
+        await manager.start()
+        snapshot = await manager.open("https://shop.example/products")
+        assert snapshot.html == page.html
+        await manager.close()
+
+    run(scenario())
+    assert page.settle_calls == [("networkidle", 500)]
+
+    disabled, disabled_page, *_ = make_manager(tmp_path / "disabled", settle_timeout_ms=0)
+
+    async def without_settle() -> None:
+        await disabled.start()
+        await disabled.open("https://shop.example/products")
+        await disabled.close()
+
+    run(without_settle())
+    assert disabled_page.settle_calls == []
+
+
+def test_route_guard_applies_page_rules_only_to_main_frame_navigations(tmp_path: Path) -> None:
+    manager, page, context, _chromium, _playwright = make_manager(tmp_path)
+    routes = {name: FakeRoute() for name in ("script", "sub_frame", "worker", "foreign", "main")}
+
+    async def load_page_resources() -> None:
+        handler = cast(Callable[[Any, Any], Awaitable[None]], context.route_handler)
+        main_frame = FakeFrame()
+        requests = {
+            "script": FakeRequest("https://cdn.static-shop.example/app.js", navigation=False),
+            "sub_frame": FakeRequest(
+                "https://static-shop.example/frame", frame=FakeFrame(parent_frame=main_frame)
+            ),
+            "worker": FakeRequest("https://static-shop.example/sw.js", frame_error=True),
+            "foreign": FakeRequest("https://tracker.example/pixel", navigation=False),
+            "main": FakeRequest("https://shop.example/products"),
+        }
+        for name, request in requests.items():
+            await handler(cast(Any, routes[name]), cast(Any, request))
+
+    page.goto_hook = load_page_resources
+
+    async def scenario() -> None:
+        await manager.start()
+        snapshot = await manager.open("https://shop.example/products")
+        assert snapshot.status_code == 200
+        await manager.close()
+
+    run(scenario())
+    assert all(routes[name].continued for name in ("script", "sub_frame", "worker", "main"))
+    assert routes["foreign"].aborted_with == "blockedbyclient"
+
+
+def test_blocked_resources_never_mask_the_real_navigation_failure(tmp_path: Path) -> None:
+    manager, page, context, _chromium, _playwright = make_manager(tmp_path)
+
+    async def block_a_resource() -> None:
+        handler = cast(Callable[[Any, Any], Awaitable[None]], context.route_handler)
+        await handler(
+            cast(Any, FakeRoute()),
+            cast(Any, FakeRequest("https://tracker.example/pixel", navigation=False)),
+        )
+
+    page.goto_hook = block_a_resource
+    page.goto_error = PlaywrightError("net::ERR_TIMED_OUT")
+
+    async def scenario() -> None:
+        await manager.start()
+        with pytest.raises(TransientBrowserManagerError):
+            await manager.open("https://shop.example/products")
+        await manager.close()
+
+    run(scenario())
+
+
+def test_redirect_to_a_sign_in_host_stops_with_an_actionable_code(tmp_path: Path) -> None:
+    manager, page, context, _chromium, _playwright = make_manager(tmp_path)
+
+    async def redirect_to_sign_in() -> None:
+        handler = cast(Callable[[Any, Any], Awaitable[None]], context.route_handler)
+        await handler(
+            cast(Any, FakeRoute()),
+            cast(Any, FakeRequest("https://login.shop.example/new/login.aspx")),
+        )
+
+    page.goto_hook = redirect_to_sign_in
+    page.goto_error = PlaywrightError("net::ERR_BLOCKED_BY_CLIENT")
+
+    async def scenario() -> None:
+        await manager.start()
+        with pytest.raises(NavigationPolicyError) as captured:
+            await manager.open("https://shop.example/products")
+        assert captured.value.code == "sign_in_required"
+        assert "personal-shopping-agent login" in str(captured.value)
         await manager.close()
 
     run(scenario())
