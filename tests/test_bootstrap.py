@@ -1,11 +1,15 @@
 """Source-checkout bootstrap process tests."""
 
+import importlib.util
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 from typing import cast
+
+import pytest
 
 from personal_shopping_agent.infrastructure.settings import DATABASE_URL_ENV
 
@@ -62,3 +66,41 @@ def test_bootstrap_stops_before_completion_for_an_invalid_database() -> None:
     payloads = _payloads(completed.stdout)
     assert [payload.get("command") for payload in payloads] == [None, "migrate"]
     assert payloads[-1]["error_code"] == "invalid_database_url"
+
+
+def _bootstrap_module() -> ModuleType:
+    specification = importlib.util.spec_from_file_location("bootstrap_script", BOOTSTRAP_SCRIPT)
+    assert specification is not None and specification.loader is not None
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def test_bootstrap_flags_append_the_claude_desktop_installer_last() -> None:
+    commands = _bootstrap_module().bootstrap_commands
+
+    assert commands([]) == (("health",), ("migrate",), ("doctor",))
+    assert commands(["--claude-desktop"])[-1] == ("install-claude-desktop",)
+    assert commands(["--claude-desktop", "--live-jd"])[-1] == (
+        "install-claude-desktop",
+        "--live-jd",
+    )
+    with pytest.raises(SystemExit):
+        commands(["--live-jd"])
+
+
+def test_windows_setup_script_keeps_crlf_and_calls_only_public_commands() -> None:
+    script = (PROJECT_ROOT / "install-windows.cmd").read_bytes()
+
+    assert script.isascii()
+    assert b"\r\n" in script and b"\n" not in script.replace(b"\r\n", b"")
+    text = script.decode("ascii")
+    invoked = [line.strip() for line in text.splitlines() if line.strip().startswith("uv run")]
+    assert invoked == [
+        r"uv run --locked python scripts\bootstrap.py --claude-desktop %LIVE%",
+        "uv run --locked playwright install chromium",
+        "uv run --locked personal-shopping-agent login jd",
+        "uv run --locked personal-shopping-agent benchmark refresh",
+    ]
+    assert "https://astral.sh/uv/install.ps1" in text
+    assert (PROJECT_ROOT / ".gitattributes").read_text().splitlines()[-1] == "*.cmd -text"

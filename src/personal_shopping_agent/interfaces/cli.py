@@ -3,6 +3,8 @@
 import argparse
 import asyncio
 import json
+import os
+import shutil
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
@@ -49,8 +51,12 @@ from personal_shopping_agent.interfaces.composition import (
 )
 from personal_shopping_agent.interfaces.health import health_check
 from personal_shopping_agent.interfaces.host_config import (
+    SERVER_NAME,
+    ClaudeDesktopConfigError,
     SourceCheckoutError,
     build_source_mcp_configuration,
+    claude_desktop_config_path,
+    install_claude_desktop_server,
 )
 from personal_shopping_agent.sourcing.benchmarks import (
     ChipBenchmarkReference,
@@ -166,6 +172,17 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     delete_parser.add_argument("workflow_id")
     delete_parser.add_argument("--confirm")
+    install_parser = commands.add_parser(
+        "install-claude-desktop",
+        help="add this project to Claude Desktop's MCP servers, keeping everything else",
+    )
+    install_parser.add_argument("--project-directory", default=".")
+    install_parser.add_argument("--live-jd", action="store_true")
+    install_parser.add_argument("--dry-run", action="store_true")
+    install_parser.add_argument(
+        "--config-path",
+        help="Claude Desktop config file; defaults to the documented location for this OS",
+    )
     benchmark_parser = commands.add_parser(
         "benchmark",
         help="refresh or show the private local chip performance reference",
@@ -251,6 +268,59 @@ def _run_mcp_config(namespace: argparse.Namespace) -> int:
                 "Live JD access still requires Chromium installation and manual acceptance."
                 if live_jd
                 else "The default server does not access shopping platforms."
+            ),
+        }
+    )
+    return 0
+
+
+def _run_install_claude_desktop(
+    namespace: argparse.Namespace,
+    *,
+    environment: Mapping[str, str] | None,
+) -> int:
+    command = "install_claude_desktop"
+    values = os.environ if environment is None else environment
+    live_jd = cast(bool, namespace.live_jd)
+    try:
+        explicit_path = cast(str | None, namespace.config_path)
+        config_path = (
+            Path(explicit_path)
+            if explicit_path
+            else claude_desktop_config_path(values, platform=sys.platform, home=Path.home())
+        )
+        configuration = build_source_mcp_configuration(
+            Path(cast(str, namespace.project_directory)),
+            live_jd=live_jd,
+            uv_command=values.get("UV") or shutil.which("uv") or "uv",
+        )
+        servers = cast(dict[str, dict[str, object]], configuration["mcpServers"])
+        result = install_claude_desktop_server(
+            config_path,
+            servers[SERVER_NAME],
+            dry_run=cast(bool, namespace.dry_run),
+        )
+    except SourceCheckoutError:
+        _emit_data_error(
+            "source_checkout_invalid",
+            "Run this from a complete Personal Shopping Agent source checkout.",
+            command=command,
+        )
+        return 2
+    except ClaudeDesktopConfigError as error:
+        _emit_data_error(error.code, str(error), command=command)
+        return 2
+    _emit(
+        {
+            "backup_path": str(result.backup_path) if result.backup_path else None,
+            "command": command,
+            "config_path": str(result.config_path),
+            "live_jd": live_jd,
+            "ok": True,
+            "server": dict(result.server),
+            "status": result.status.value,
+            "next_step": (
+                "Fully quit and reopen Claude Desktop, then ask it to call shopping_agent_status."
             ),
         }
     )
@@ -628,6 +698,9 @@ def main(
 
     if command_name == "data":
         return _run_data_command(namespace, environment=environment)
+
+    if command_name == "install-claude-desktop":
+        return _run_install_claude_desktop(namespace, environment=environment)
 
     if command_name == "improvement-case":
         return _run_improvement_case(namespace, environment=environment)

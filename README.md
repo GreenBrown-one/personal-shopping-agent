@@ -27,12 +27,19 @@ M0–M7 的首轮架构、本地可用性与发布基线已经完成；M8 把代
 
 ## 快速开始
 
+**Windows 一键安装：** 下载并解压仓库后，双击根目录的 `install-windows.cmd`。它会按顺序：缺少 uv 时征得同意后
+安装、初始化数据库、询问是否启用真实京东、写入 Claude Desktop 配置（先备份，只改本项目条目）、安装浏览器、
+打开浏览器让你亲自登录京东、可选下载芯片跑分榜。完成后完全退出并重新打开 Claude Desktop。
+
+**命令行方式：**
+
 要求：安装 [uv](https://docs.astral.sh/uv/)，首次运行时可联网下载 Python 3.12 和锁定依赖。
 
 下载或克隆仓库后，在项目目录运行：
 
 ```bash
-uv run --locked python scripts/bootstrap.py
+uv run --locked python scripts/bootstrap.py                    # 只初始化
+uv run --locked python scripts/bootstrap.py --claude-desktop   # 初始化并写入 Claude Desktop 配置
 ```
 
 该命令复用正式 CLI，依次执行健康检查、数据库向前迁移和就绪检查。随后可启动默认本地 MCP：
