@@ -55,7 +55,9 @@ def test_saved_reference_has_owner_only_permissions(tmp_path: Path) -> None:
 def test_nonregular_or_invalid_files_are_rejected(tmp_path: Path) -> None:
     path = tmp_path / "benchmarks" / "socpk.json"
     store = LocalJsonBenchmarkStore(path)
-    path.mkdir(parents=True)
+    store.save(REFERENCE)
+    path.unlink()
+    path.mkdir()
     with pytest.raises(BenchmarkStoreError, match="not private"):
         store.load()
 
