@@ -27,6 +27,7 @@ personal-shopping-agent-mcp-jd = "personal_shopping_agent.interfaces.mcp.server:
 
 [dependency-groups]
 dev = [
+  "coverage-conditional-plugin>=0.9,<1",
   "mcp[cli]>=2,<3",
   "pyright>=1.1.400,<2",
   "pytest>=8.3,<9",
@@ -49,7 +50,12 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
+plugins = ["coverage_conditional_plugin"]
 source = ["personal_shopping_agent"]
+
+[tool.coverage.coverage_conditional_plugin.rules]
+# POSIX permission enforcement is unreachable elsewhere (DESIGN.md 8.1); Linux CI still covers it.
+"#\\s*pragma:\\s*posix-only" = "os_name != 'posix'"
 
 [tool.coverage.report]
 fail_under = 100

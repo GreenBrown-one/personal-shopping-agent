@@ -1,6 +1,7 @@
 """Unit tests for the controlled Playwright lifecycle without live network access."""
 
 import asyncio
+import os
 import stat
 from collections.abc import Awaitable, Callable, Coroutine
 from datetime import UTC, datetime
@@ -261,7 +262,8 @@ def test_context_manager_starts_and_closes_existing_page(tmp_path: Path) -> None
         "headless": False,
         "accept_downloads": False,
     }
-    assert stat.S_IMODE((tmp_path / "profile").stat().st_mode) == 0o700
+    if os.name == "posix":
+        assert stat.S_IMODE((tmp_path / "profile").stat().st_mode) == 0o700
     assert context.closed
     assert playwright.stopped
     run(manager.close())
@@ -313,14 +315,33 @@ def test_open_returns_bounded_snapshot_and_optional_screenshot(tmp_path: Path) -
     screenshot_path, full_page = page.screenshot_calls[0]
     assert screenshot_path.startswith(str(tmp_path / "screenshots"))
     assert full_page
-    assert stat.S_IMODE((tmp_path / "screenshots").stat().st_mode) == 0o700
-    assert stat.S_IMODE(Path(screenshot_path).stat().st_mode) == 0o600
+    if os.name == "posix":
+        assert stat.S_IMODE((tmp_path / "screenshots").stat().st_mode) == 0o700
+        assert stat.S_IMODE(Path(screenshot_path).stat().st_mode) == 0o600
 
 
-def test_start_rejects_an_insecure_existing_profile(tmp_path: Path) -> None:
-    profile = tmp_path / "profile"
-    profile.mkdir(mode=0o755)
-    profile.chmod(0o755)
+def make_insecure_directory(path: Path, kind: str) -> None:
+    if kind == "file":
+        path.write_text("not a directory")
+    else:
+        path.mkdir(mode=0o755)
+        path.chmod(0o755)
+
+
+INSECURE_DIRECTORY_KINDS = [
+    "file",
+    pytest.param(
+        "shared",
+        marks=pytest.mark.skipif(
+            os.name != "posix", reason="owner-only mode bits are enforced only on POSIX hosts"
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("kind", INSECURE_DIRECTORY_KINDS)
+def test_start_rejects_an_insecure_existing_profile(tmp_path: Path, kind: str) -> None:
+    make_insecure_directory(tmp_path / "profile", kind)
     manager, _page, context, _chromium, playwright = make_manager(tmp_path)
 
     with pytest.raises(BrowserManagerError, match="profile directory is not private"):
@@ -368,11 +389,10 @@ def test_screenshot_failures_are_sanitized_and_remove_partial_files(
     assert not tuple((tmp_path / "second" / "screenshots").glob("*.png"))
 
 
-def test_screenshot_rejects_an_insecure_existing_directory(tmp_path: Path) -> None:
+@pytest.mark.parametrize("kind", INSECURE_DIRECTORY_KINDS)
+def test_screenshot_rejects_an_insecure_existing_directory(tmp_path: Path, kind: str) -> None:
     manager, _page, _context, _chromium, _playwright = make_manager(tmp_path)
-    screenshots = tmp_path / "screenshots"
-    screenshots.mkdir(mode=0o755)
-    screenshots.chmod(0o755)
+    make_insecure_directory(tmp_path / "screenshots", kind)
 
     async def scenario() -> None:
         await manager.start()

@@ -161,7 +161,8 @@ def test_local_archive_writer_is_private_integrity_checked_and_never_overwrites(
 
     assert receipt.bytes_written == len(content)
     assert receipt.content_sha256 == hashlib.sha256(content).hexdigest()
-    assert stat.S_IMODE(output_path.stat().st_mode) == 0o600
+    if os.name == "posix":
+        assert stat.S_IMODE(output_path.stat().st_mode) == 0o600
     payload = json.loads(content)
     assert payload["archive_format"] == ARCHIVE_FORMAT
     assert payload["data"]["snapshot"]["request"]["query"] == "private test query"

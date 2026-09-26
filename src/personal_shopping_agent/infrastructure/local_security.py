@@ -1,4 +1,11 @@
-"""Fail-closed local filesystem boundaries for private application state."""
+"""Fail-closed local filesystem boundaries for private application state.
+
+Structural checks (no symbolic links, regular files and directories only) apply on every host.
+Owner-only mode bits and the single-hard-link rule are enforced only where POSIX permissions
+exist; elsewhere the permission state is reported as unknown (`None`) and access is governed by
+the host ACL, as specified in DESIGN.md section 8.1. Branches marked `pragma: posix-only` are
+excluded from coverage only on non-POSIX hosts.
+"""
 
 from __future__ import annotations
 
@@ -32,12 +39,13 @@ def require_private_directory(path: Path) -> None:
             details = path.lstat()
         except FileNotFoundError:
             path.mkdir(parents=True, mode=PRIVATE_DIRECTORY_MODE)
-            if POSIX_PERMISSIONS:
+            if POSIX_PERMISSIONS:  # pragma: posix-only
                 path.chmod(PRIVATE_DIRECTORY_MODE)
             details = path.lstat()
         if not stat.S_ISDIR(details.st_mode) or stat.S_ISLNK(details.st_mode):
             raise LocalFileSecurityError("private directory target is not a regular directory")
-        if POSIX_PERMISSIONS and stat.S_IMODE(details.st_mode) != PRIVATE_DIRECTORY_MODE:
+        mode = stat.S_IMODE(details.st_mode)
+        if POSIX_PERMISSIONS and mode != PRIVATE_DIRECTORY_MODE:  # pragma: posix-only
             raise LocalFileSecurityError("private directory permissions are not owner-only")
     except LocalFileSecurityError:
         raise
@@ -57,7 +65,7 @@ def inspect_private_file(path: Path) -> PrivateFileStatus:
 
     if not stat.S_ISREG(details.st_mode) or stat.S_ISLNK(details.st_mode):
         return PrivateFileStatus(exists=True, private_permissions=False)
-    if POSIX_PERMISSIONS:
+    if POSIX_PERMISSIONS:  # pragma: posix-only
         permissions_private = stat.S_IMODE(details.st_mode) == PRIVATE_FILE_MODE
         links_private = details.st_nlink == 1
         return PrivateFileStatus(
@@ -91,19 +99,18 @@ def secure_existing_private_file(path: Path) -> None:
     """Restrict an existing regular, unlinked file without creating a replacement."""
 
     try:
-        status = inspect_private_file(path)
-        if not status.exists:
-            raise LocalFileSecurityError("private file target does not exist")
-        details = path.lstat()
+        try:
+            details = path.lstat()
+        except FileNotFoundError:
+            raise LocalFileSecurityError("private file target does not exist") from None
         if not stat.S_ISREG(details.st_mode) or stat.S_ISLNK(details.st_mode):
             raise LocalFileSecurityError("private file target is not a regular file")
-        if POSIX_PERMISSIONS and details.st_nlink != 1:
-            raise LocalFileSecurityError("private file target has additional hard links")
-        if POSIX_PERMISSIONS:
+        if POSIX_PERMISSIONS:  # pragma: posix-only
+            if details.st_nlink != 1:
+                raise LocalFileSecurityError("private file target has additional hard links")
             path.chmod(PRIVATE_FILE_MODE)
-        secured = inspect_private_file(path)
-        if secured.private_permissions is False:
-            raise LocalFileSecurityError("private file permissions could not be restricted")
+            if inspect_private_file(path).private_permissions is not True:
+                raise LocalFileSecurityError("private file permissions could not be restricted")
     except LocalFileSecurityError:
         raise
     except OSError as error:
@@ -115,7 +122,7 @@ def _prepare_parent(parent: Path) -> None:
         details = parent.lstat()
     except FileNotFoundError:
         parent.mkdir(parents=True, mode=PRIVATE_DIRECTORY_MODE)
-        if POSIX_PERMISSIONS:
+        if POSIX_PERMISSIONS:  # pragma: posix-only
             parent.chmod(PRIVATE_DIRECTORY_MODE)
         details = parent.lstat()
     if not stat.S_ISDIR(details.st_mode) or stat.S_ISLNK(details.st_mode):

@@ -15,18 +15,32 @@ from personal_shopping_agent.infrastructure.local_security import (
     secure_existing_private_file,
 )
 
+posix_only = pytest.mark.skipif(
+    os.name != "posix", reason="owner-only mode bits are enforced only on POSIX hosts"
+)
 
-def test_private_directory_is_created_once_with_owner_only_access(tmp_path: Path) -> None:
+
+def test_private_directory_is_created_once(tmp_path: Path) -> None:
     directory = tmp_path / "nested" / "private"
 
     require_private_directory(directory)
     require_private_directory(directory)
 
     assert directory.is_dir()
+
+
+@posix_only
+def test_private_directory_is_created_with_owner_only_access(tmp_path: Path) -> None:
+    directory = tmp_path / "nested" / "private"
+
+    require_private_directory(directory)
+
     assert stat.S_IMODE(directory.stat().st_mode) == 0o700
 
 
-@pytest.mark.parametrize("target_kind", ["file", "directory", "symlink"])
+@pytest.mark.parametrize(
+    "target_kind", ["file", pytest.param("directory", marks=posix_only), "symlink"]
+)
 def test_private_directory_rejects_unsafe_existing_targets(
     tmp_path: Path,
     target_kind: str,
@@ -59,10 +73,23 @@ def test_private_directory_sanitizes_filesystem_errors(
     assert "sensitive directory detail" not in str(captured.value)
 
 
-def test_private_file_creation_inspection_and_permission_repair(tmp_path: Path) -> None:
+def test_private_file_creation_reports_host_permission_state(tmp_path: Path) -> None:
     path = tmp_path / "nested" / "state.db"
 
     assert inspect_private_file(path).exists is False
+    prepare_private_file(path)
+    prepare_private_file(path)
+
+    status = inspect_private_file(path)
+    assert path.is_file()
+    assert status.exists is True
+    assert status.private_permissions is (True if os.name == "posix" else None)
+
+
+@posix_only
+def test_private_file_creation_inspection_and_permission_repair(tmp_path: Path) -> None:
+    path = tmp_path / "nested" / "state.db"
+
     prepare_private_file(path)
     assert inspect_private_file(path).private_permissions is True
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
@@ -74,7 +101,7 @@ def test_private_file_creation_inspection_and_permission_repair(tmp_path: Path) 
     assert inspect_private_file(path).private_permissions is True
 
 
-def test_private_file_rejects_nonregular_symlink_and_hardlink_targets(tmp_path: Path) -> None:
+def test_private_file_rejects_nonregular_and_symlink_targets(tmp_path: Path) -> None:
     directory = tmp_path / "directory"
     directory.mkdir()
     assert inspect_private_file(directory).private_permissions is False
@@ -88,6 +115,12 @@ def test_private_file_rejects_nonregular_symlink_and_hardlink_targets(tmp_path: 
     assert inspect_private_file(symlink).private_permissions is False
     with pytest.raises(LocalFileSecurityError, match="regular file"):
         prepare_private_file(symlink)
+
+
+@posix_only
+def test_private_file_rejects_hardlinked_targets(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    prepare_private_file(source)
 
     hardlink = tmp_path / "hardlink"
     hardlink.hardlink_to(source)
@@ -108,7 +141,7 @@ def test_existing_private_file_is_required_and_parent_must_be_a_directory(
         prepare_private_file(parent / "state.db")
 
 
-def test_private_file_sanitizes_inspection_creation_and_permission_errors(
+def test_private_file_sanitizes_inspection_and_creation_errors(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -121,6 +154,9 @@ def test_private_file_sanitizes_inspection_creation_and_permission_errors(
     with pytest.raises(LocalFileSecurityError, match="could not be inspected") as captured:
         inspect_private_file(target)
     assert "sensitive inspection detail" not in str(captured.value)
+    with pytest.raises(LocalFileSecurityError, match="could not be secured") as captured:
+        secure_existing_private_file(target)
+    assert "sensitive inspection detail" not in str(captured.value)
 
     monkeypatch.undo()
 
@@ -132,7 +168,13 @@ def test_private_file_sanitizes_inspection_creation_and_permission_errors(
         prepare_private_file(target)
     assert "sensitive creation detail" not in str(captured.value)
 
-    monkeypatch.undo()
+
+@posix_only
+def test_private_file_sanitizes_permission_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "target"
     target.write_text("state")
     target.chmod(0o644)
 
